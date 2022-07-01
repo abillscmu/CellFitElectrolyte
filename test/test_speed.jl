@@ -20,7 +20,7 @@ CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,anodeocv,cat
 
 
 
-benchmark = @benchmark CellFitElectrolyte.equations_electrolyte($du,$u,$p,1.0,$cache,$cellgeometry,$cathodeocv,$anodeocv,3,4.2)
+benchmark = @benchmark CellFitElectrolyte.equations_electrolyte($du,$u,$p,1.0,$cache,$cellgeometry,$cathodeocv,$anodeocv)
 
 @test benchmark.allocs<=0
 @test benchmark.memory<=0

@@ -255,20 +255,21 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv)
     ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
     ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
     #Thermal Equations
-    return U⁺.-U⁻.-η₊.-η₋.-ηc₋.-ηc₊.-ηₒ₋.-ηₒ₊
+    V = U⁺.-U⁻.-η₊.-η₋.-ηc₋.-ηc₊.-ηₒ₋.-ηₒ₊
+    return V
 end
 
 
-function calc_voltage(u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
-    Iapp = u[14]
+function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},cellgeometry::ComponentVector{T},cathodeocv::RKPolynomial{Vector{T},T},anodeocv::RKPolynomial{Vector{T},T}) where {T}
+    Iapp::T = u[14]
 
-    cₛˢ⁻ = u[1]
-    cₛᵇ⁻ = u[2]
-    cₑ⁻ = u[3]
-    cₑˢ = u[4]
-    cₑ⁺ = u[5]
-    cₛᵇ⁺ = u[6]
-    cₛˢ⁺ = u[7]
+    cₛˢ⁻::T = u[1]
+    cₛᵇ⁻::T = u[2]
+    cₑ⁻::T = u[3]
+    cₑˢ::T = u[4]
+    cₑ⁺::T = u[5]
+    cₛᵇ⁺::T = u[6]
+    cₛˢ⁺::T = u[7]
 
 
     #Transport Parameters
@@ -284,37 +285,38 @@ function calc_voltage(u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     @unpack R⁺,R⁻= p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
 
-    εₛ⁻ = u[8]
-    εₑ⁻ = u[9]
-    εₑˢ = u[10]
-    εₑ⁺ = u[11]
-    εₛ⁺ = u[12]
-    T = u[13]
+    εₛ⁻::T = u[8]
+    εₑ⁻::T = u[9]
+    εₑˢ::T = u[10]
+    εₑ⁺::T = u[11]
+    εₛ⁺::T = u[12]
+    Temp::T = u[13]
 
     #Current Density
-    a⁻ = 3 *εₛ⁺/R⁻
-    a⁺ = 3 *εₛ⁺/R⁺
-    A⁻ = 2 *Vₛ⁻*a⁻
-    A⁺ = 2 *Vₛ⁺*a⁺
-    J⁻ = Iapp/A⁻
-    J⁺ = Iapp/A⁺
+    a⁻::T = 3 *εₛ⁺/R⁻
+    a⁺::T = 3 *εₛ⁺/R⁺
+    A⁻::T = 2 *Vₛ⁻*a⁻
+    A⁺::T = 2 *Vₛ⁺*a⁺
+    J⁻::T = Iapp/A⁻
+    J⁺::T = Iapp/A⁺
 
     #Calculate Voltages
-    U⁺ = calcocv(cathodeocv,(cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
-    U⁻ = calcocv(anodeocv,(cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),T)
+    U⁺::T = calcocv(cathodeocv,(cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+    U⁻::T = calcocv(anodeocv,(cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
     
-    J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
-    J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
+    J₀⁻::T = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
+    J₀⁺::T = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
     
-    η₊ = butler_volmer(J₀⁺,J⁺,T)
-    η₋ = butler_volmer(J₀⁻,J⁻,T)
+    η₊::T = butler_volmer(J₀⁺,J⁺,Temp)
+    η₋::T = butler_volmer(J₀⁻,J⁻,Temp)
     
-    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,T,T⁻)
-    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,T,T⁺)
+    ηc₋::T = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+    ηc₊::T = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
     
-    ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
-    ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+    ηₒ₋::T = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
+    ηₒ₊::T = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
     #Thermal Equations
-    return U⁺-U⁻-η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊
+    V::T = U⁺-U⁻-η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊
+    return V
 end
 

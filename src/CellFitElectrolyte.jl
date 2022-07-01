@@ -13,11 +13,12 @@ using FileIO
 using JLD2
 
 include("parameters.jl")
+include("cache.jl")
 include("models.jl")
 #include("simulator.jl")
 include("initialize.jl")
-include("cache.jl")
 include("inputbuilder.jl")
+include("SimulatedAnnealing.jl")
 
 export simulate,initialize
 end # module
