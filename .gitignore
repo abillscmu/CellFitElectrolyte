@@ -1,2 +1,5 @@
 Manifest.toml
 .vscode
+data/cycle_individual_data/
+.DS_Store
+*.zip
