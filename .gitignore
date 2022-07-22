@@ -1,5 +1,8 @@
 Manifest.toml
 .vscode
 data/cycle_individual_data/
+data/params.csv
 .DS_Store
 *.zip
+reports/figs
+reports/detailedreportVAH*

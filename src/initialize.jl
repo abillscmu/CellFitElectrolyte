@@ -32,7 +32,8 @@ function p_transport()
         t⁺ = 0.3,
         #Load
         input_type = 3,
-        input_value = 4.2
+        input_value = 4.2,
+        E = 500.0
     )
 end
 
