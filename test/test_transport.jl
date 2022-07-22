@@ -2,6 +2,7 @@ using CellFitElectrolyte
 using CellFitElectrolyte.ComponentArrays
 using CellFitElectrolyte.OrdinaryDiffEq
 using CellFitElectrolyte.OCV
+using CellFitElectrolyte.LinearAlgebra
 using Test
 
 type = Float64
@@ -61,44 +62,6 @@ x_s_p = sol[6,:]./cathodeocv.c_s_max
 x_b_p = sol[7,:]./cathodeocv.c_s_max
 
 myOCV = cathodeocv.(x_s_p,sol[13,:]).-anodeocv.(x_s_n,sol[13,:])
-
-using MATLABPlots
-figure(1)
-clf()
-subplot(4,1,1)
-plot(sol.t,sol[1,:]./anodeocv.c_s_max)
-hold_on()
-plot(sol.t,sol[2,:]./anodeocv.c_s_max)
-legend(["Surface Concentration","Bulk Concentration"])
-ylabel("x^{-}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,2)
-plot(sol.t,sol[3,:])
-hold_on()
-plot(sol.t,sol[4,:])
-plot(sol.t,sol[5,:])
-legend(["Negative","Separator","Positive"])
-ylabel("c_{e}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,3)
-plot(sol.t,sol[6,:]./cathodeocv.c_s_max)
-hold_on()
-plot(sol.t,sol[7,:]./cathodeocv.c_s_max)
-legend(["Surface","Bulk"])
-ylabel("x^{+}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,4)
-plot(sol.t,V)
-hold_on()
-plot(sol.t,myOCV)
-legend(["Voltage","OCV"])
-ylabel("Voltage")
-xlabel("Time[s]")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
 
 
 @test n_li_change<1e-10

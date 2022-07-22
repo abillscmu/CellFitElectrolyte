@@ -25,6 +25,7 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     #Transport Parameters
     @unpack θₛ⁻,θₑ,θₛ⁺ = p
     @unpack β⁻,βˢ,β⁺ = p
+    @unpack E = p
     #Kinetic Parameters
     @unpack k₀⁺,k₀⁻ = p
     #Thermal Parameters
@@ -176,6 +177,12 @@ function volume_correction!(mm_cache,cellgeometry,εₛ⁻,εₑ⁻,εₑˢ,ε�
     mm_cache[4] = 1/(cellgeometry.Vₑˢ*εₑˢ)
     mm_cache[5] = 1/(cellgeometry.Vₑ⁺*εₑ⁺)
     mm_cache[6:7] .= 1/(cellgeometry.Vₛ⁺*εₛ⁺)
+end
+
+function arrhenius(A,E,T)
+    correction = exp(E/293-E/T)
+    #note: can only get away with this when correction is a scalar
+    mul!(A,A,correction)
 end
 
 
