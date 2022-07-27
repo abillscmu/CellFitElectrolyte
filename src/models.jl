@@ -17,9 +17,10 @@
 # T     [13]
 
 function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
-    Iapp = u[14]
     cₛˢ⁻,cₛᵇ⁻,cₑ⁻,cₑˢ,cₑ⁺,cₛᵇ⁺,cₛˢ⁺ = @view u[1:7]
-    @unpack Tamb = p
+    @unpack Temp = p
+    @unpack input_type,input_value = p
+    Iapp = input_value
 
 
     #Transport Parameters
@@ -36,9 +37,20 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     #Geometry
     @unpack R⁺,R⁻ = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
+    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
+    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
+    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
+    εₑ⁻ = 1-(1+X⁻)εₛ⁻
+    εₑ⁺ = 1-(1+X⁺)εₛ⁺
 
-    εₛ⁻,εₑ⁻,εₑˢ,εₑ⁺,εₛ⁺ = @view u[8:12]
-    T = u[13]
+    #Geometry
+    a⁻ = 3*εₛ⁻/R⁻
+    a⁺ = 3*εₛ⁺/R⁺
+    A⁻ = 2Vₛ⁻*a⁻
+    A⁺ = 2Vₛ⁺*a⁺
+    
+    J⁻ = Iapp/A⁻
+    J⁺ = Iapp/A⁺
 
     #Fill transport and apply bruggeman corrections (and temp later)
     fill_transport!(cache.A,θₛ⁻,θₑ,θₛ⁺,εₑ⁻,εₑ⁺,β⁻,β⁺)
@@ -51,24 +63,21 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     du[1:7].=cache.du_transport.+cache.control
 
     #Apply corrections for temperature to diffusion
-
+    arrhenius!(cache.A,E,Temp)
 
 
     #Apply Mass Matrix
     volume_correction!(cache.mm_cache,cellgeometry,εₛ⁻, εₑ⁻,εₑˢ,εₑ⁺,εₛ⁺)
     du[1:7] .= (@view du[1:7]).*cache.mm_cache
 
-    #Current Density
-    a⁻ = 3*εₛ⁻/R⁻
-    a⁺ = 3*εₛ⁺/R⁺
-    A⁻ = 2Vₛ⁻*a⁻
-    A⁺ = 2Vₛ⁺*a⁺
-    J⁻ = Iapp/A⁻
-    J⁺ = Iapp/A⁺
+ 
 
     #Calculate Voltages
     #U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
     #U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),T)
+    
+    
+    #= COMMENTED FOR TRANSPORT-ONLY SYSTEM
     J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
     J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
     
@@ -82,18 +91,10 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
 
     η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊
-    du[13] = (η*Iapp-h*(T-Tamb))/c
+    =#
 
 
-
-
-
-    du[8]=0
-    du[9]=0
-    du[10]=0
-    du[11]=0
-    du[12]=0
-    @unpack input_type,input_value = p
+    #= STATE MACHINE COMMENTED FOR THIS ROUND OF PARAM FITTING
         #Calculate Current
         if input_type==0
             du[14] = Iapp-0
@@ -116,6 +117,7 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
             @warn "condition not recognized"
             du[14] = Iapp-0
         end
+    =#
     #Thermal Equations
     return nothing
 end
@@ -179,13 +181,16 @@ function volume_correction!(mm_cache,cellgeometry,εₛ⁻,εₑ⁻,εₑˢ,ε�
     mm_cache[6:7] .= 1/(cellgeometry.Vₛ⁺*εₛ⁺)
 end
 
-function arrhenius(A,E,T)
-    correction = exp(E/293-E/T)
+function arrhenius!(A,E,Temp)
+    correction = exp(E/293-E/Temp)
     #note: can only get away with this when correction is a scalar
     mul!(A,A,correction)
 end
 
-
+function sei_ohmic(δ,ω,Iapp)
+    η_sei = δ*ω*Iapp
+    return η_sei
+end
 
 
 function exchange_current_density(cₛ,cₑ,c_s_max,k₀)
@@ -197,8 +202,8 @@ function butler_volmer(J₀,J,T)
     return @fastmath (R.*T./(0.5.*F)).*asinh.(J./(2J₀))
 end
 
-function concentration_overpotential(cₑ⁺,cₑ⁻,t⁺,T,Δx)
-    @fastmath ΔΦ = 2 .*(1 .-t⁺).*R.*T.*log.(cₑ⁺./cₑ⁻)./(F)
+function concentration_overpotential(cₑ⁺,cₑ⁻,t⁺,Temp,Δx)
+    @fastmath ΔΦ = 2 .*(1 .-t⁺).*R.*Temp.*log.(cₑ⁺./cₑ⁻)./(F)
     return ΔΦ
 end
 
@@ -206,8 +211,7 @@ function electrolyte_ohmic(ε,β,κ,Iapp,Δx)
     return Δx.*Iapp./(ε.^β.*κ)
 end
 
-function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv)
-    Iapp = @view sol[14,:]
+function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp::Array,Temp::Array)
 
     cₛˢ⁻ = @view sol[1,:]
     cₛᵇ⁻ = @view sol[2,:]
@@ -229,14 +233,14 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv)
 
     #Geometry
     @unpack R⁺,R⁻= p
+    @unpack ω_+,ω_- = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-
-    εₛ⁻ = @view sol[8,:]
-    εₑ⁻ = @view sol[9,:]
-    εₑˢ = @view sol[10,:]
-    εₑ⁺ = @view sol[11,:]
-    εₛ⁺ = @view sol[12,:]
-    T = @view sol[13,:]
+    
+    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
+    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
+    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
+    εₑ⁻ = 1-(1+X⁻)εₛ⁻
+    εₑ⁺ = 1-(1+X⁺)εₛ⁺
 
     #Current Density
     a⁻ = 3 .*εₛ⁺./R⁻
@@ -247,28 +251,31 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv)
     J⁺ = Iapp./A⁺
 
     #Calculate Voltages
-    U⁺ = cathodeocv.((cₛˢ⁺.-cathodeocv.c_s_min)./(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
-    U⁻ = anodeocv.((cₛˢ⁻.-anodeocv.c_s_min)./(anodeocv.c_s_max-anodeocv.c_s_min),T)
+    U⁺ = cathodeocv.((cₛˢ⁺.-cathodeocv.c_s_min)./(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+    U⁻ = anodeocv.((cₛˢ⁻.-anodeocv.c_s_min)./(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
     
     J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
     J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
     
-    η₊ = butler_volmer(J₀⁺,J⁺,T)
-    η₋ = butler_volmer(J₀⁻,J⁻,T)
+    η₊ = butler_volmer(J₀⁺,J⁺,Temp)
+    η₋ = butler_volmer(J₀⁻,J⁻,Temp)
     
-    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,T,T⁻)
-    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,T,T⁺)
+    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
     
     ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
     ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+
+    η_sei_+ = sei_ohmic(δ⁺,ω_+,Iapp)
+    η_sei_- = sei_ohmic(δ⁻,ω_-,Iapp)
     #Thermal Equations
     V = U⁺.-U⁻.-η₊.-η₋.-ηc₋.-ηc₊.-ηₒ₋.-ηₒ₊
     return V
 end
 
 
-function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},cellgeometry::ComponentVector{T},cathodeocv::RKPolynomial{Vector{T},T},anodeocv::RKPolynomial{Vector{T},T}) where {T}
-    Iapp::T = u[14]
+function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},cellgeometry::ComponentVector{T},cathodeocv::RKPolynomial{Vector{T},T},anodeocv::RKPolynomial{Vector{T},T},Iapp) where {T}
+    #Iapp::T = u[14]
 
     cₛˢ⁻::T = u[1]
     cₛᵇ⁻::T = u[2]
@@ -291,13 +298,11 @@ function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},c
     #Geometry
     @unpack R⁺,R⁻= p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-
-    εₛ⁻::T = u[8]
-    εₑ⁻::T = u[9]
-    εₑˢ::T = u[10]
-    εₑ⁺::T = u[11]
-    εₛ⁺::T = u[12]
-    Temp::T = u[13]
+    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
+    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
+    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
+    εₑ⁻ = 1-(1+X⁻)εₛ⁻
+    εₑ⁺ = 1-(1+X⁺)εₛ⁺
 
     #Current Density
     a⁻::T = 3 *εₛ⁺/R⁻
