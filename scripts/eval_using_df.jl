@@ -55,6 +55,9 @@ function evaluator(p::ComponentVector{T}) where {T}
     CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     u[13] = p.Tamb
     du = similar(u)
+    input_type::T = types[1]
+    input_value::T = values[1]
+    @pack! p = input_type,input_value
 
     #Create Function and Initialize Integrator
     func = ODEFunction((du::Array{T,1},u::Array{T,1},p::ComponentVector{T},t::T)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv),mass_matrix=mass_mat)
@@ -66,8 +69,8 @@ function evaluator(p::ComponentVector{T}) where {T}
     endT::Array{T,1} = Array{T,1}(undef,length(df.EcellV)-1)
 
     for step::Int in 1:num_steps-1
-        input_type::T = types[step]
-        input_value::T = values[step]
+        input_type = types[step]
+        input_value = values[step]
         if input_type==5
             input_type = 3
             input_value = values[step]

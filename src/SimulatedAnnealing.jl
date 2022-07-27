@@ -85,7 +85,7 @@ function anneal(loss::Function, parent,λ::Float64)
 end
 
 
-function anneal_step(loss::Function, parent, λ; options::annealOptions = annealOptions( 1., 1000, 2000, 3000, 1e-8, -Inf, 1))
+function anneal_step(loss::Function, parent, λ; options::annealOptions = annealOptions( 1., 1000, 2000, 3000, 1e-8, -Inf, 2))
     # println(options)
     # Initialize Upper Bound to Infinity
     ub = Array{Float64, 1}(undef, length(parent))
