@@ -1,11 +1,10 @@
-REPORT = 2
+using Pkg
+Pkg.activate(".")
 using Weave, Dates, CSV, DataFrames
-
-
-
 PARAM_FILE = "data/params.csv"
 
 df = CSV.read(PARAM_FILE,DataFrame)
+REPORT = parse(Int,ENV["SLURM_ARRAY_TASK_ID"])
 df = filter(row->row.cell==REPORT,df)
 sort!(df,"cycle")
 
@@ -39,8 +38,9 @@ end
 
 close(io)
 
-mkdir("reports/figs")
+mkdir("reports/figs$REPORT")
 
-weave("/Users/alecbills/ResearchProjects/CellFitElectrolyte/reports/detailedreportVAH$REPORT.jl"; doctype = "md2html",fig_path="figs")
+weave("reports/detailedreportVAH$REPORT.jl"; doctype = "md2html",fig_path="figs$REPORT")
 
-rm("reports/figs",recursive=true)
+rm("reports/figs$REPORT",recursive=true)
+
