@@ -11,6 +11,7 @@ using StaticArrays
 using OCV
 using FileIO
 using JLD2
+using DataInterpolations
 
 include("parameters.jl")
 include("cache.jl")

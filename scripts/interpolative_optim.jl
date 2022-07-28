@@ -3,6 +3,7 @@ using CellFitElectrolyte.ComponentArrays
 using CellFitElectrolyte.OrdinaryDiffEq
 using CellFitElectrolyte.OCV
 using CellFitElectrolyte.Parameters
+using CellFitElectrolyte.DataInterpolations
 using CSV
 using DataFrames
 using Test
@@ -16,26 +17,39 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH05_1501"
+VAH = ARGS[1]
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
 current = -df.ImA./1000
-p.Tamb = df.TemperatureC[1].+273.15
-TData = df.TemperatureC[1:end-1]
-VData = df.EcellV[1:end-1]
 
 
-cycle_array = CellFitElectrolyte.current_profile(current,df.times)
+#Get and set up interpolants
+current_interpolant = LinearInterpolation(current,df.times)
+voltage_interpolant = LinearInterpolation(df.EcellV,df.times)
+temperature_interpolant = LinearInterpolation(df.TemperatureC.+273.15,df.times)
+
+interpolated_time = collect(range(df.times[1],stop=df.times[end],step=1.0))
+
+
+interpolated_current = current_interpolant.(interpolated_time)
+interpolated_voltage = voltage_interpolant.(interpolated_time)
+interpolated_temperature = temperature_interpolant.(interpolated_time)
+
+
+#set up cycle arrays
+cycle_array = CellFitElectrolyte.current_profile(interpolated_current,interpolated_time)
 num_steps = Int(cycle_array[1])
 times = cycle_array[2:num_steps+1]
 types = cycle_array[num_steps+2:num_steps+1+num_steps]
 values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
+
+
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
@@ -64,11 +78,11 @@ function evaluator(p::ComponentVector{T}) where {T}
     integrator = init(prob,Rodas4(autodiff=false),save_everystep=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
-    endV::Array{T,1} = Array{T,1}(undef,length(df.EcellV)-1)
-    endT::Array{T,1} = Array{T,1}(undef,length(df.EcellV)-1)
+    endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
+    endT::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
 
     for step::Int in 1:num_steps-1
-        Temp = df.TemperatureC[step].+273.15
+        Temp = interpolated_temperature[step]
         @pack! p = Temp
         input_type = types[step]
         input_value = values[step]
@@ -79,8 +93,8 @@ function evaluator(p::ComponentVector{T}) where {T}
         endT[step] = Temp
     end
 
-    V_rmse::T = sqrt.(mean((endV.-VData).^2))
-    T_rmse::T = sqrt.(mean((endT.-TData.-273.15).^2))
+    V_rmse::T = sqrt.(mean((endV.-interpolated_voltage[1:end-1]).^2))
+    T_rmse::T = sqrt.(mean((endT.-interpolated_temperature[1:end-1]).^2))
     return endV
 end
 
@@ -109,16 +123,9 @@ function loss(vec)
 
     return l
 end
+
 options = CellFitElectrolyte.annealOptions( 1., 1000, 2000, 3000, 1e-4, -Inf, 2)
-#=
-params_new = CSV.read("../CellFitElectrolyteData/PARAM/$(VAH)_PARAM.csv",DataFrame)
-param_sym = Symbol.(names(params_new))
-for param in param_sym[1:end-3]
-    if param in keys(p)
-        p[param] = params_new[!,param][1]
-    end
-end
-=#
+
 p.δ⁺ = 2.2e-8
 p.δ⁻ = 2.2e-8
 p.E = 5000
@@ -145,10 +152,10 @@ end
 
 
 
-#loss(parent)
+loss(parent)
 
-#param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
-#=
+param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
+
 minimum = param[1]
 fval = param[2]
 
@@ -167,5 +174,5 @@ newparams = vcat(newparams,:cycle)
 df = DataFrame(newminimum,newparams)
 CSV.write("$(VAH)_PARAM.csv",df)
 sleep(5)
-=#
+
 
