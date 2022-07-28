@@ -111,7 +111,7 @@ function evaluator(p::ComponentVector{T}) where {T}
 end
 
 
-
+#=
 params = CSV.read("../CellFitElectrolyteData/PARAM/$(VAH)_PARAM.csv",DataFrame)
 param_sym = Symbol.(names(params))
 for param in param_sym[1:end-3]
@@ -119,9 +119,10 @@ for param in param_sym[1:end-3]
         p[param] = params[!,param][1]
     end
 end
+=#
 V,t = evaluator(p)
 
-
+#=
 using MATLABPlots
 figure(1)
 clf()
@@ -133,7 +134,6 @@ ylabel("Voltage[V]")
 legend(["Data","Model"])
 title("VAH $cell cycle $cycle. Error: $(params.fval) mV")
 setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-
-
+=#
 
 
