@@ -1,39 +1,45 @@
 function p_transport()
     p = ComponentArray(
         #Transport
-        θₛ⁻ = 6.5e-9,
-        θₑ = 4e-6,
-        θₛ⁺ = 5e-8,
-        R⁺ = 1e-6,
-        R⁻ = 1e-6,
+        θₛ⁻ = 6.5e-8,
+        θₑ = 3.9e-1,
+        θₛ⁺ = 1.65e-7,
+        R⁺ = 1e-7,
+        R⁻ = 4e-7,
         β⁻ = 1.5,
         β⁺ = 1.5,
         βˢ = 1.5,
+        εₛ⁻ = 0.55,
+        εₛ⁺ = 0.48,
+        δ⁻ = 1e-8,
+        δ⁺ = 1e-8,
+
         #Thermal
         c = 50.0,
         h = 0.1,
         Tamb = 298.15,
+        Temp = 298.15,
 
         #Kinetic
-        k₀⁺ = 1e-4,
-        k₀⁻ = 1e-1,
+        k₀⁺ = 7e-4,
+        k₀⁻ = 4e-1,
         #Initial
         x⁻₀ = 0.6,
-        
-        εₛ⁻ = 0.6,
+    
 
-        εₑ⁻ = 0.2,
-        εₑˢ = 0.4,
-        εₑ⁺ = 0.2,
+        εₑˢ = 0.8,
 
-        εₛ⁺ = 0.55,
         cₑ₀ = 1000.0,
         κ = 8.5e-2,
-        t⁺ = 0.3,
+        t⁺ = 0.7,
         #Load
         input_type = 3,
         input_value = 4.2,
-        E = 500.0
+        E = 0.0,
+
+        #SEI
+        ω⁺ = 1.0,
+        ω⁻ = 1.0,
     )
 end
 
@@ -51,6 +57,7 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     u[3:5] .= p.cₑ₀
     u[6:7] .= c_p_init
     
+    #=
     u[8] = p.εₛ⁻
     u[9] = p.εₑ⁻
     u[10] = p.εₑˢ
@@ -58,6 +65,7 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     u[12] = p.εₛ⁺
 
     u[13] = T
+    =#
 
     return u
 end

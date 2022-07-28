@@ -96,7 +96,7 @@ end
 @time evaluator(p,prob)
 V_RMSE,T_RMSE = evaluator(p,prob)
 println("Voltage RMSE: $V_RMSE")
-println("Temperature RMSE: $T_RMSE")
+println("Temperature RMSE: $T_")
 
 return 4
 

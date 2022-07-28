@@ -2,115 +2,170 @@ using CellFitElectrolyte
 using CellFitElectrolyte.ComponentArrays
 using CellFitElectrolyte.OrdinaryDiffEq
 using CellFitElectrolyte.OCV
+using CellFitElectrolyte.Parameters
+using CSV
+using DataFrames
 using Test
+using ProgressMeter
+using LinearAlgebra
+using Statistics
+using JLD2
 
-type = Float64
-
-cache = CellFitElectrolyte.initialize_cache(type)
-p = CellFitElectrolyte.p_transport()
-CellFitElectrolyte.fill_transport!(cache.A,p.θₛ⁻,p.θₑ,p.θₛ⁺)
+cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
+p = CellFitElectrolyte.p_transport()
 
-initialcond = Dict(
-    "Starting Voltage[V]"=>3.9,
-    "Ambient Temperature[K]"=>298.0,
-    "Capacity[mAh]"=>3000.0)
+VAH = "VAH05_1501"
+split1 = split(VAH,['H','_'])
+cell = parse(Int,split1[2])
+cycle = parse(Int,split1[3])
+
+
+df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df.times = df.times.-df.times[1]
+initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
+current = -df.ImA./1000
+p.Tamb = df.TemperatureC[1].+273.15
+TData = df.TemperatureC[1:end-1]
+VData = df.EcellV[1:end-1]
+
+
+cycle_array = CellFitElectrolyte.current_profile(current,df.times)
+num_steps = Int(cycle_array[1])
+times = cycle_array[2:num_steps+1]
+types = cycle_array[num_steps+2:num_steps+1+num_steps]
+values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
 
 
-f(t) = 8.4
-
-
-u  = Array{type,1}(undef,13)
-
-u = CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
-du = similar(u)
-end_dt = 100.0
-
-prob = ODEProblem((du,u,p,t)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv,f),u,(0.0,end_dt),p,dtmax=0.001)
-
-sol = solve(prob,Rodas4(autodiff=false))
-
-concentrations = sol[1:7,:]
-Vₛ⁻ = cellgeometry.Vₛ⁻
-Vₛ⁺ = cellgeometry.Vₛ⁺
-Vₑ⁻ = cellgeometry.Vₑ⁻
-Vₑˢ = cellgeometry.Vₑˢ
-Vₑ⁺ = cellgeometry.Vₑ⁺
-
-εₛ⁻ = sol[8,1]
-εₑ⁻ = sol[9,1]
-εₑˢ = sol[10,1]
-εₑ⁺ = sol[11,1]
-εₛ⁺ = sol[12,1]
-
-mass_vector = [Vₛ⁻*εₛ⁻,Vₛ⁻*εₛ⁻,Vₑ⁻*εₑ⁻,Vₑˢ*εₑˢ,Vₑ⁺*εₑ⁺,Vₛ⁺*εₛ⁺,Vₛ⁺*εₛ⁺]
-n_li = concentrations'*mass_vector
-n_li_change = maximum(abs.((n_li.-(n_li[1]))./n_li[1]))
-
-V = CellFitElectrolyte.calc_voltage(sol,p,sol.t,cache,cellgeometry,cathodeocv,anodeocv,f)
-
-
-x_s_n = sol[1,:]./anodeocv.c_s_max
-x_b_n = sol[2,:]./anodeocv.c_s_max
-
-x_s_p = sol[6,:]./cathodeocv.c_s_max
-x_b_p = sol[7,:]./cathodeocv.c_s_max
-
-myOCV = cathodeocv.(x_s_p,sol[13,:]).-anodeocv.(x_s_n,sol[13,:])
-
-using MATLABPlots
-figure(1)
-clf()
-subplot(4,1,1)
-plot(sol.t,sol[1,:]./anodeocv.c_s_max)
-hold_on()
-plot(sol.t,sol[2,:]./anodeocv.c_s_max)
-legend(["Surface Concentration","Bulk Concentration"])
-ylabel("x^{-}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,2)
-plot(sol.t,sol[3,:])
-hold_on()
-plot(sol.t,sol[4,:])
-plot(sol.t,sol[5,:])
-legend(["Negative","Separator","Positive"])
-ylabel("c_{e}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,3)
-plot(sol.t,sol[6,:]./cathodeocv.c_s_max)
-hold_on()
-plot(sol.t,sol[7,:]./cathodeocv.c_s_max)
-legend(["Surface","Bulk"])
-ylabel("x^{+}")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-subplot(4,1,4)
-plot(sol.t,V)
-hold_on()
-plot(sol.t,myOCV)
-legend(["Voltage","OCV"])
-ylabel("Voltage")
-xlabel("Time[s]")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-
-figure(2)
-clf()
-plot(sol.t,myOCV.-V)
-xlabel("Time[s]")
-ylabel("\\eta")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-grid_on()
-
-
-@test n_li_change<1e-10
 
 
 
+
+
+function evaluator(p::ComponentVector{T}) where {T}
+
+    # Handle Initial Conditions
+    u::Array{T,1}  = Array{T,1}(undef,7)
+    CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
+    Temp = df.TemperatureC[1].+273.15
+    @pack! p = Temp
+    du = similar(u)
+    input_type::T = types[1]
+    input_value::T = values[1]
+    @pack! p = input_type,input_value
+
+    #Create Function and Initialize Integrator
+    func = ODEFunction((du::Array{T,1},u::Array{T,1},p::ComponentVector{T},t::T)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
+    prob = ODEProblem(func,u,(0.0,times[end]),p)
+    integrator = init(prob,Rodas4(autodiff=false),save_everystep=false)
+
+    #we're really only interested in temperature and voltage, so we'll just save those
+    endV::Array{T,1} = Array{T,1}(undef,length(df.EcellV)-1)
+    endT::Array{T,1} = Array{T,1}(undef,length(df.EcellV)-1)
+
+    for step::Int in 1:num_steps-1
+        Temp = df.TemperatureC[step].+273.15
+        @pack! p = Temp
+        input_type = types[step]
+        input_value = values[step]
+        end_time::T = times[step+1]
+        @pack! p = input_type,input_value
+        step!(integrator,end_time-integrator.t,true)
+        endV[step] = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
+        endT[step] = Temp
+    end
+
+    V_rmse::T = sqrt.(mean((endV.-VData).^2))
+    T_rmse::T = sqrt.(mean((endT.-TData.-273.15).^2))
+    return 1000*V_rmse
+end
+
+
+params = keys(p)
+params = filter(e->e∉[:Tamb,:c,:h,:x⁻₀,:β⁻,:β⁺,:βˢ,:Temp,:input_value,:input_type],params)
+parent = zeros(length(params))
+ub = zeros(length(params))
+lb = zeros(length(params))
+
+
+
+
+function loss(vec)
+    for (i,param) in enumerate(params)
+        p[param] = vec[i]
+    end
+    p.input_type = 3
+    p.input_value = 4.2
+    l=10e6
+    try
+     l = evaluator(p)
+    catch
+        l=10e6
+    end
+
+    return l
+end
+options = CellFitElectrolyte.annealOptions( 1., 1000, 2000, 3000, 1e-4, -Inf, 2)
+
+params_new = CSV.read("../CellFitElectrolyteData/PARAM/$(VAH)_PARAM.csv",DataFrame)
+param_sym = Symbol.(names(params_new))
+for param in param_sym[1:end-3]
+    if param in keys(p)
+        p[param] = params_new[!,param][1]
+    end
+end
+
+p.δ⁺ = 2.2e-8
+p.δ⁻ = 2.2e-8
+p.E = 5000
+
+for (i,param) in enumerate(params)
+    parent[i] = p[param]
+    if param == :t⁺
+        ub[i] = 0.75
+        lb[i] = 0.25
+    elseif param in [:εₛ⁻,:εₑ⁻,:εₑˢ,:εₑ⁺,:εₛ⁺]
+        ub[i] = 1.0
+        lb[i] = 0.0
+    elseif param in [:R⁺,:θₛ⁺]
+        ub[i] = p[param]*100.0
+        lb[i] = 0.1*p[param]
+    elseif param==:θₑ
+        ub[i] = p[param]*10.0
+        lb[i] = p[param]*0.001
+    else
+        ub[i] = p[param]*10.0
+        lb[i] = p[param]*0.1
+    end
+end
+
+
+
+loss(parent)
+
+#param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
+#=
+minimum = param[1]
+fval = param[2]
+
+
+minimum=vcat(minimum,fval)
+minimum=vcat(minimum,cell)
+minimum=vcat(minimum,cycle)
+newminimum = [[x] for x in minimum]
+
+
+newparams = [p for p in params]
+newparams = vcat(newparams,:fval)
+newparams = vcat(newparams,:cell)
+newparams = vcat(newparams,:cycle)
+
+df = DataFrame(newminimum,newparams)
+CSV.write("$(VAH)_PARAM.csv",df)
+sleep(5)
+=#
 

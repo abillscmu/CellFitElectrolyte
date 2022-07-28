@@ -10,7 +10,7 @@ CellFitElectrolyte.fill_transport!(cache.A,p.θₛ⁻,p.θₑ,p.θₛ⁺)
 
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
-u = Array{Float64,1}(undef,14)
+u = Array{Float64,1}(undef,7)
 du = similar(u)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 initialcond = Dict("Starting Voltage[V]"=>4.0,"Ambient Temperature[K]"=>298.0)
