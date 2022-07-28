@@ -86,7 +86,7 @@ end
 
 
 params = keys(p)
-#params = filter(e->e∉[:Tamb,:c,:h,:x⁻₀],params)
+params = filter(e->e∉[:Tamb,:c,:h,:x⁻₀,:β⁻,:β⁺,:βˢ,:Temp,:input_value,:input_type],params)
 parent = zeros(length(params))
 ub = zeros(length(params))
 lb = zeros(length(params))
@@ -131,9 +131,6 @@ for (i,param) in enumerate(params)
     elseif param in [:εₛ⁻,:εₑ⁻,:εₑˢ,:εₑ⁺,:εₛ⁺]
         ub[i] = 1.0
         lb[i] = 0.0
-    elseif param in [:β⁻,:β⁺,:βˢ]
-        ub[i] = 2.0
-        lb[i] = 1.0
     elseif param in [:R⁺,:θₛ⁺]
         ub[i] = p[param]*100.0
         lb[i] = 0.1*p[param]
@@ -148,9 +145,9 @@ end
 
 
 
-loss(p)
+loss(parent)
 
-param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
+#param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
 #=
 minimum = param[1]
 fval = param[2]
