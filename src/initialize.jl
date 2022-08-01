@@ -1,9 +1,9 @@
 function p_transport()
     p = ComponentArray(
         #Transport
-        θₛ⁻ = 6.5e-8,
+        θₛ⁻ = 2e-8,
         θₑ = 3.9e-1,
-        θₛ⁺ = 1.65e-7,
+        θₛ⁺ = 1.65e-6,
         R⁺ = 1e-7,
         R⁻ = 4e-7,
         β⁻ = 1.5,
@@ -11,8 +11,8 @@ function p_transport()
         βˢ = 1.5,
         εₛ⁻ = 0.55,
         εₛ⁺ = 0.48,
-        δ⁻ = 1e-8,
-        δ⁺ = 1e-8,
+        δ⁻ = 1e-9,
+        δ⁺ = 0.0,
 
         #Thermal
         c = 50.0,
@@ -31,15 +31,15 @@ function p_transport()
 
         cₑ₀ = 1000.0,
         κ = 8.5e-2,
-        t⁺ = 0.7,
+        t⁺ = 0.6,
         #Load
         input_type = 3,
         input_value = 4.2,
-        E = 0.0,
+        E = 5000.0,
 
         #SEI
-        ω⁺ = 1.0,
-        ω⁻ = 1.0,
+        ω⁺ = 0.0001,
+        ω⁻ = 0.0001,
     )
 end
 

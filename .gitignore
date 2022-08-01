@@ -6,3 +6,4 @@ data/params.csv
 *.zip
 reports/figs
 reports/detailedreportVAH*
+outputs/
