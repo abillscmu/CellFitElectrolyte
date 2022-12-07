@@ -243,7 +243,7 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp
     εₑ⁺ = 1-(1+X⁺)εₛ⁺
 
     #Current Density
-    a⁻ = 3 .*εₛ⁺./R⁻
+    a⁻ = 3 .*εₛ⁻./R⁻
     a⁺ = 3 .*εₛ⁺/R⁺
     A⁻ = 2 .*Vₛ⁻.*a⁻
     A⁺ = 2 .*Vₛ⁺.*a⁺
