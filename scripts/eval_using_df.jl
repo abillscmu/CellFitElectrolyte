@@ -17,7 +17,7 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH02_500"
+VAH = "VAH02_579"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -25,6 +25,10 @@ cycle = parse(Int,split1[3])
 
 df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
+idx = findfirst(isequal(0),df.Ns)
+df = df[1:idx,:]
+
+
 initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
 current = -df.ImA./1000
 
@@ -56,8 +60,7 @@ cellgeometry = CellFitElectrolyte.cell_geometry()
 
 
 
-
-
+p = p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 1.6464068552786306, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.6, input_type = 3.0, input_value = 4.2, E = 5000.0, ω⁺ = 0.0001, ω⁻ = 0.0001)
 
 
 function evaluator(p::ComponentVector{T}) where {T}
@@ -95,11 +98,12 @@ function evaluator(p::ComponentVector{T}) where {T}
 
     V_rmse::T = sqrt.(mean((endV.-interpolated_voltage[1:end-1]).^2))
     T_rmse::T = sqrt.(mean((endT.-interpolated_temperature[1:end-1]).^2))
-    return endV,endT
+    return endV,endT,integrator.sol.t
 end
 
-
-params = CSV.read("data/outputs/outputs0728_interpolative/$(VAH)_PARAM.csv",DataFrame)
+#p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 1.6464068552786306, θₛ⁺ = 6.547741580032837e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-2, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 1000.0, κ = 0.2025997972168558, t⁺ = 0.6, input_type = 3.0, input_value = 4.2, E = 5000.0, ω⁺ = 1, ω⁻ = 1)
+p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 1.6464068552786306, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.6, input_type = 3.0, input_value = 4.2, E = 5000.0, ω⁺ = 0.0001, ω⁻ = 0.0001)
+params = CSV.read("results/VAH02_1204/$(VAH)_PARAM.csv",DataFrame)
 param_sym = Symbol.(names(params))
 for param in param_sym[1:end-3]
     if param in keys(p)
@@ -107,12 +111,13 @@ for param in param_sym[1:end-3]
     end
 end
 
+#=
 p.θₛ⁻ = 2e-8
 p.ω⁻ = 0.0001
 p.δ⁻ = 3.14e-9
 p.δ⁺ = 0
 p.εₛ⁻ = 0.6
-
+=#
 
 V,t = evaluator(p)
 
@@ -121,17 +126,10 @@ V_rmse = sqrt.(mean((V.-interpolated_voltage[1:end-1]).^2))
 println("V_rmse:",V_rmse)
 
 
-using MATLABPlots
-figure(1)
-clf()
-plot(df.times,df.EcellV)
-hold_on()
+using Plots
+plotly()
+
+
+
 plot(interpolated_time[1:end-1],V)
-xlabel("Time[s]")
-ylabel("Voltage[V]")
-legend(["Data","Model"])
-title("VAH $cell cycle $cycle. Error: $(params.fval) mV")
-setgca(Dict("FontName"=>"Open Sans","FontSize"=>16))
-
-
-
+plot!(df.times,df.EcellV)

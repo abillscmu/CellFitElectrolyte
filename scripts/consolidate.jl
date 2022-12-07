@@ -1,4 +1,4 @@
-FOLDERNAME = "data/outputs/outputs0728_interpolative"
+FOLDERNAME = "results/VAH02_1204"
 
 
 
