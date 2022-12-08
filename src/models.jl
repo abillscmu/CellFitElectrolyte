@@ -306,7 +306,7 @@ function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},c
     εₑ⁺ = 1-(1+X⁺)εₛ⁺
 
     #Current Density
-    a⁻::T = 3 *εₛ⁺/R⁻
+    a⁻::T = 3 *εₛ⁻/R⁻
     a⁺::T = 3 *εₛ⁺/R⁺
     A⁻::T = 2 *Vₛ⁻*a⁻
     A⁺::T = 2 *Vₛ⁺*a⁺
