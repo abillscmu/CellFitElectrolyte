@@ -1,4 +1,4 @@
-using LinearAlgebra,Statistics, CSV, DataFrames, MATLABPlots, StatsBase
+using LinearAlgebra,Statistics, CSV, DataFrames, StatsBase
 
 function movingaverage(vec,M)
     N = length(vec)
@@ -50,7 +50,7 @@ sort!(df,"cycle")
 bottom = 2
 top = 300
 
-s = "εₛ⁻"
+s = "ω⁻"
 
 color1 = [230,159,0]./255
 color2 = [86,180,233]./255
