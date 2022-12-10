@@ -52,9 +52,30 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     c_n_init = x⁻₀*(anodeocv.c_s_max-anodeocv.c_s_min)
     c_p_init = x⁺₀*(cathodeocv.c_s_max-cathodeocv.c_s_min)
 
-    
+    @unpack Vₛ⁻,Vₛ⁺,Vₑ⁻,Vₑˢ,Vₑ⁺  = cellgeometry
+    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
+    @unpack R⁺,R⁻= p
+    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
+    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
+    εₑ⁻ = 1-(1+X⁻)εₛ⁻ 
+    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+
+    Veffₛ⁻ = εₛ⁻*Vₛ⁻
+    Veffₛ⁺ = εₛ⁺*Vₛ⁺
+    Veffₑ⁻ = εₑ⁻*Vₑ⁻
+    Veffₑˢ = εₑˢ*Vₑˢ
+    Veffₑ⁺ = εₑ⁺*Vₑ⁺
+    Veffₑ = Veffₑ⁺ + Veffₑ⁻ + Veffₑˢ
+
+    total_li = p.n_li
+
+    li_n_init = 2*c_n_init*Veffₛ⁻
+    li_p_init = 2*c_p_init*Veffₛ⁺
+    li_e_init = total_li - li_n_init - li_p_init
+    cₑ₀ = li_e_init / Veffₑ
+
     u[1:2] .= c_n_init
-    u[3:5] .= p.cₑ₀
+    u[3:5] .= cₑ₀
     u[6:7] .= c_p_init
     
     #=
