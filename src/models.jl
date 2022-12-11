@@ -187,8 +187,8 @@ function arrhenius!(A,E,Temp)
     mul!(A,A,correction)
 end
 
-function sei_ohmic(δ,ω,Iapp)
-    η_sei = δ*ω*Iapp
+function sei_ohmic(ω,Iapp)
+    η_sei = ω*Iapp
     return η_sei
 end
 
@@ -233,7 +233,7 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp
 
     #Geometry
     @unpack R⁺,R⁻ = p
-    @unpack ω⁺,ω⁻ = p
+    @unpack ω = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
     
     @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
@@ -266,10 +266,9 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp
     ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
     ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
 
-    ηₛ⁺ = sei_ohmic(δ⁺,ω⁺,Iapp)
-    ηₛ⁻ = sei_ohmic(δ⁻,ω⁻,Iapp)
+    ηₛ = sei_ohmic(ω,Iapp)
     #Thermal Equations
-    V = U⁺.-U⁻.-η₊.-η₋.-ηc₋.-ηc₊.-ηₒ₋.-ηₒ₊.-ηₛ⁻ .-ηₛ⁺
+    V = U⁺.-U⁻.-η₊.-η₋.-ηc₋.-ηc₊.-ηₒ₋.-ηₒ₊.-ηₛ
     return V
 end
 
@@ -299,7 +298,7 @@ function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},c
     @unpack R⁺,R⁻= p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
     @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
-    @unpack ω⁺,ω⁻ = p
+    @unpack ω = p
     X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
     X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
     εₑ⁻ = 1-(1+X⁻)εₛ⁻
@@ -330,10 +329,9 @@ function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},c
     ηₒ₊::T = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
 
     #Calculate SEI Overpotential
-    ηₛ⁺ = sei_ohmic(δ⁺,ω⁺,Iapp)
-    ηₛ⁻ = sei_ohmic(δ⁻,ω⁻,Iapp)
+    ηₛ = sei_ohmic(ω,Iapp)
     #Thermal Equations
-    V::T = U⁺-U⁻-η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ⁻ -ηₛ⁺
+    V::T = U⁺-U⁻-η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ
     return V
 end
 

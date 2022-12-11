@@ -1,4 +1,4 @@
-FOLDERNAME = "results/outputs1208_vah02/"
+FOLDERNAME = "results/outputs1210_full/"
 
 
 

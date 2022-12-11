@@ -38,8 +38,7 @@ function p_transport()
         E = 5000.0,
 
         #SEI
-        ω⁺ = 0.0001,
-        ω⁻ = 0.0001,
+        ω = 0.0001
     )
 end
 
@@ -77,17 +76,6 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     u[1:2] .= c_n_init
     u[3:5] .= cₑ₀
     u[6:7] .= c_p_init
-    
-    #=
-    u[8] = p.εₛ⁻
-    u[9] = p.εₑ⁻
-    u[10] = p.εₑˢ
-    u[11] = p.εₑ⁺
-    u[12] = p.εₛ⁺
-
-    u[13] = T
-    =#
-
     return u
 end
 
