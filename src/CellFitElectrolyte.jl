@@ -12,6 +12,8 @@ using OCV
 using FileIO
 using JLD2
 using DataInterpolations
+using PreallocationTools
+using Turing
 
 include("parameters.jl")
 include("cache.jl")
@@ -20,6 +22,7 @@ include("models.jl")
 include("initialize.jl")
 include("inputbuilder.jl")
 include("SimulatedAnnealing.jl")
+include("models_allocating.jl")
 
 export simulate,initialize
 end # module

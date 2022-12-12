@@ -17,7 +17,7 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH12_500"
+VAH = "VAH12_1000"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -76,9 +76,9 @@ function evaluator(p::ComponentVector{T}) where {T}
     @pack! p = input_type,input_value
 
     #Create Function and Initialize Integrator
-    func = ODEFunction((du::Array{T,1},u::Array{T,1},p::ComponentVector{T},t::T)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
+    func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false)
+    integrator = init(prob,QNDF(),save_everystep=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -111,18 +111,7 @@ for param in param_sym[1:end-3]
     end
 end
 
-#=
-p.θₛ⁻ = 2e-8
-p.ω⁻ = 0.0001
-p.δ⁻ = 3.14e-9
-p.δ⁺ = 0
-p.εₛ⁻ = 0.6
-=#
-#p.δ⁻ = 1.15751e-7
-#p.ω = 0.05
-p.Eₛ⁻ = 0
-p.Eₑ = 0
-p.Eₛ⁺ = 000
+
 
 V,t = evaluator(p)
 

@@ -56,6 +56,12 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
 
     #Fill transport and apply bruggeman corrections (and temp later)
     fill_transport!(cache.A,θₛ⁻,θₑ,θₛ⁺,εₑ⁻,εₑ⁺,β⁻,β⁺)
+    
+
+    #Apply corrections for temperature to diffusion
+    arrhenius!(view(cache.A, 1:2, 1:2),Eₛ⁻,Temp)
+    arrhenius!(view(cache.A, 3:5, 3:5),Eₑ,Temp)
+    arrhenius!(view(cache.A, 6:7, 6:7),Eₛ⁺,Temp)
 
     #Calculate Transport Matrix
     mul!(cache.du_transport,cache.A,@view u[1:7])
@@ -64,65 +70,9 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     mul!(cache.control,cache.controller,Iapp)
     du[1:7].=cache.du_transport.+cache.control
 
-    #Apply corrections for temperature to diffusion
-    arrhenius!(view(cache.A, 1:2, 1:2),Eₛ⁻,Temp)
-    arrhenius!(view(cache.A, 3:5, 3:5),Eₑ,Temp)
-    arrhenius!(view(cache.A, 6:7, 6:7),Eₛ⁺,Temp)
-
-
     #Apply Mass Matrix
     volume_correction!(cache.mm_cache,cellgeometry,εₛ⁻, εₑ⁻,εₑˢ,εₑ⁺,εₛ⁺)
     du[1:7] .= (@view du[1:7]).*cache.mm_cache
-
- 
-
-    #Calculate Voltages
-    #U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
-    #U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),T)
-    
-    
-    #= COMMENTED FOR TRANSPORT-ONLY SYSTEM
-    J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
-    J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
-    
-    η₊ = butler_volmer(J₀⁺,J⁺,T)
-    η₋ = butler_volmer(J₀⁻,J⁻,T)
-    
-    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,T,T⁻)
-    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,T,T⁺)
-    
-    ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
-    ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
-
-    η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊
-    =#
-
-
-    #= STATE MACHINE COMMENTED FOR THIS ROUND OF PARAM FITTING
-        #Calculate Current
-        if input_type==0
-            du[14] = Iapp-0
-            # println(Iapp)
-        elseif input_type==1
-            U⁺ = calcocv(cathodeocv,(cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
-            U⁻ = calcocv(anodeocv,(cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),T)
-            Voltage = U⁺-U⁻-η
-            du[14] = input_value-(Iapp*Voltage)
-        elseif input_type==2
-            U⁺ = calcocv(cathodeocv,(cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),T)
-            U⁻ = calcocv(anodeocv,(cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),T)
-            Voltage = U⁺-U⁻-η
-            du[14] = input_value-Voltage 
-        elseif input_type==3
-            du[14] = Iapp-input_value;
-        elseif input_type==4
-            du[14] = Iapp-0
-        else
-            @warn "condition not recognized"
-            du[14] = Iapp-0
-        end
-    =#
-    #Thermal Equations
     return nothing
 end
 
@@ -300,12 +250,12 @@ function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},c
     #Geometry
     @unpack R⁺,R⁻= p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
+    @unpack εₛ⁻,εₛ⁺,εₑˢ,Temp = p
     @unpack ω = p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+    @unpack εᵧ⁺,εᵧ⁻ = p
+
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
 
     #Current Density
     a⁻::T = 3 *εₛ⁻/R⁻
