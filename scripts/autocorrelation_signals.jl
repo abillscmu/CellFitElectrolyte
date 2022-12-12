@@ -1,8 +1,11 @@
 using StatsBase
+using PythonCall
+using PythonPlot
+mk = pyimport("pymannkendall")
 
 dfi = 6
 
-sym = :δ⁻
+sym = :δ⁺
 
 
 cell = unique(gdf[dfi].cell)
@@ -27,4 +30,13 @@ grid()
 xlim([0, length(ac)])
 xlabel("Lag")
 ylabel("ACF")
+title("Series : VAH$(lpad(Int(cell[1]), 2, "0"))")
+
+figure(2)
+clf()
+PythonPlot.matplotlib.rcParams["font.size"] = 18
+scatter(df_sorted.cycle,log10.(df_sorted[!, sym]))
+grid()
+xlabel("Cycle")
+ylabel("$(string(sym))")
 title("Series : VAH$(lpad(Int(cell[1]), 2, "0"))")

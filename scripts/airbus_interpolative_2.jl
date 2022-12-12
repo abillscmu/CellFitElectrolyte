@@ -15,21 +15,25 @@ using JLD2
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
-p = CellFitElectrolyte.p_transport()
-
-VAH = "VAH12_1000"
+p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, E = 5000.0, ω = 0.01, n_li = 0.21)
+VAH = ARGS[1]
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
-idx = findfirst(isequal(0),df.Ns)
-df = df[1:idx,:]
+filter!(row->row.Ns>=4,df)
 
+vfull = 4.2
+if cell==7
+	vfull=4.0
+elseif cell ==23
+	vfull=4.1
+end
 
-initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
+initialcond = Dict("Starting Voltage[V]"=>vfull,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
 current = -df.ImA./1000
 
 
@@ -60,7 +64,8 @@ cellgeometry = CellFitElectrolyte.cell_geometry()
 
 
 
-p = p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 1.6464068552786306, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.6, input_type = 3.0, input_value = 4.2, E = 5000.0, ω = 0.01)
+
+
 
 
 function evaluator(p::ComponentVector{T}) where {T}
@@ -78,7 +83,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     #Create Function and Initialize Integrator
     func = ODEFunction((du::Array{T,1},u::Array{T,1},p::ComponentVector{T},t::T)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, verbose=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -96,44 +101,93 @@ function evaluator(p::ComponentVector{T}) where {T}
         endT[step] = Temp
     end
 
-    V_rmse::T = sqrt.(mean((endV.-interpolated_voltage[1:end-1]).^2))
+    V_rmse::T = mean(abs.((endV.-interpolated_voltage[1:end-1])))
+    min_V_error = abs(minimum(endV) .- minimum(interpolated_voltage))
+    V_T = (min_V_error + V_rmse)/2
     T_rmse::T = sqrt.(mean((endT.-interpolated_temperature[1:end-1]).^2))
-    return endV,endT,integrator.sol.t
+    return V_T
 end
 
-p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, n_li = 0.21, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
-params = CSV.read("results/outputs1211_full/$(VAH)_PARAM.csv",DataFrame)
-param_sym = Symbol.(names(params))
 
-for param in param_sym[1:end-3]
-    if param in keys(p)
-        p[param] = params[!,param][1]
+params = [:εₛ⁻,:εₛ⁺,:δ⁻,:δ⁺, :n_li, :ω]
+#params = filter(e->e∉[:Tamb,:c,:h,:x⁻₀,:β⁻,:β⁺,:βˢ,:Temp,:input_value,:input_type,:t⁺,:ω⁺,:E,:εₑˢ],params)
+parent = zeros(length(params))
+ub = zeros(length(params))
+lb = zeros(length(params))
+
+
+
+
+function loss(vec)
+    for (i,param) in enumerate(params)
+        p[param] = vec[i]
+    end
+    p.input_type = 3
+    p.input_value = 4.2
+    l=10e6
+    try
+     l = evaluator(p)
+    catch
+        l=10e6
+    end
+
+    return l
+end
+
+options = CellFitElectrolyte.annealOptions( 1., 1000, 2000, 3000, 1e-4, -Inf, 2)
+
+
+
+for (i,param) in enumerate(params)
+    parent[i] = p[param]
+    if param in [:εₛ⁻,:εₑ⁻,:εₑˢ,:εₑ⁺,:εₛ⁺]
+        ub[i] = 1.0
+        lb[i] = 0.0
+    elseif param in [:R⁺,:θₛ⁺]
+        ub[i] = p[param]*100.0
+        lb[i] = 0.1*p[param]
+    elseif param==:θₑ
+        ub[i] = p[param]*10.0
+        lb[i] = p[param]*0.001
+    elseif param in [:δ⁺,:δ⁻]
+        ub[i] = 1e-6
+        lb[i] = 0.0
+    elseif param in [:n_li]
+	    ub[i] = 0.23
+	    lb[i] = 0.12
+    elseif param in [:ω]
+        ub[i] = 0.05
+        lb[i] = 0.0
+    else
+        ub[i] = parent[i].*10.0
+        lb[i] = parent[i].*0.1
     end
 end
 
-#=
-p.θₛ⁻ = 2e-8
-p.ω⁻ = 0.0001
-p.δ⁻ = 3.14e-9
-p.δ⁺ = 0
-p.εₛ⁻ = 0.6
-=#
-#p.δ⁻ = 1.15751e-7
-#p.ω = 0.05
 
 
-V,t = evaluator(p)
+loss(parent)
+evaluator(p)
 
-V_rmse = sqrt.(mean((V.-interpolated_voltage[1:end-1]).^2))
+param = CellFitElectrolyte.anneal(loss,parent,ub,lb,options=options)
 
-println("V_rmse:",V_rmse)
+minimum_ps = param[1]
+fval = param[2]
 
 
-using PythonPlot
-figure(1)
-clf()
-plot(df.times,df.EcellV)
-plot(interpolated_time[1:end-1],V,"--")
-PythonPlot.yticks(2.4:0.4:4.2)
-legend(["Experiment", "Model"])
-PythonPlot.grid()
+minimum_ps=vcat(minimum_ps,fval)
+minimum_ps=vcat(minimum_ps,cell)
+minimum_ps=vcat(minimum_ps,cycle)
+newminimum_ps = [[x] for x in minimum_ps]
+
+
+newparams = [p for p in params]
+newparams = vcat(newparams,:fval)
+newparams = vcat(newparams,:cell)
+newparams = vcat(newparams,:cycle)
+
+df = DataFrame(newminimum_ps,newparams)
+CSV.write("$(VAH)_PARAM.csv",df)
+sleep(5)
+
+
