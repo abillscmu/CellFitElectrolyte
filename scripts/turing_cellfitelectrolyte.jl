@@ -106,8 +106,8 @@ end
     ω ~ truncated(Normal(0.02, 0.001), 0.01, 0.05)
     εₛ⁻ ~ Uniform(0.5, 0.75)
     εₛ⁺ ~ Uniform(0.4, 0.6)
-    εᵧ⁺ ~ Uniform(0.0, 0.1)
-    εᵧ⁻ ~ Uniform(0.0, 0.1)
+    εᵧ⁺ ~ Uniform(0.0, 0.125)
+    εᵧ⁻ ~ Uniform(0.0, 0.125)
 
     p = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, n_li = n_li, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
@@ -131,38 +131,38 @@ chain = sample(model, DynamicNUTS(), 1000)
 εᵧ⁻ = kde(chain[:εᵧ⁻].data[:,1])
 ω = kde(chain[:ω].data[:,1])
 n_li = kde(chain[:n_li].data[:,1])
+
+
+
 figure(1);
 clf()
+subplot(321)
 plot(εₛ⁻.x, εₛ⁻.density)
 xlabel("εₛ⁻")
 ylabel("Density")
-
-figure(2);
-clf()
+grid()
+subplot(322)
 plot(ω.x, ω.density)
 ylabel("Density")
 xlabel("SEI Resistance")
-
-figure(3);
-clf()
+grid()
+subplot(323)
 plot(n_li.x,n_li.density)
 ylabel("Density")
 xlabel("Moles Li")
-
-figure(4);
-clf()
+grid()
+subplot(324)
 plot(εₛ⁺.x,εₛ⁺.density)
 ylabel("Density")
 xlabel("εₛ⁺")
-
-figure(5);
-clf()
+grid()
+subplot(325)
 plot(εᵧ⁺.x,εᵧ⁺.density)
 ylabel("Density")
 xlabel("εᵧ⁺")
-
-figure(6);
-clf()
+grid()
+subplot(326)
 plot(εᵧ⁻.x,εᵧ⁻.density)
 ylabel("Density")
 xlabel("εᵧ⁻")
+grid()

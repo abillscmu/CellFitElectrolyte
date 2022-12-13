@@ -14,6 +14,7 @@ using JLD2
 using DataInterpolations
 using PreallocationTools
 using Turing
+using DynamicHMC
 
 include("parameters.jl")
 include("cache.jl")
