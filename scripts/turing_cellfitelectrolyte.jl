@@ -4,6 +4,8 @@ using CellFitElectrolyte.OrdinaryDiffEq
 using CellFitElectrolyte.OCV
 using CellFitElectrolyte.Parameters
 using CellFitElectrolyte.DataInterpolations
+using Turing
+using DynamicHMC
 using CSV
 using DataFrames
 using Test
@@ -11,13 +13,15 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using PythonPlot
+using KernelDensity
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH12_500"
+VAH = "VAH12_2001"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -57,14 +61,7 @@ values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
-
-
-
-p = p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 1.6464068552786306, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.6, input_type = 3.0, input_value = 4.2, E = 5000.0, ω = 0.01)
-
-
 function evaluator(p::ComponentVector{T}) where {T}
-
     # Handle Initial Conditions
     u::Array{T,1}  = Array{T,1}(undef,7)
     CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
@@ -76,13 +73,13 @@ function evaluator(p::ComponentVector{T}) where {T}
     @pack! p = input_type,input_value
 
     #Create Function and Initialize Integrator
-    func = ODEFunction((du::Array{T,1},u::Array{T,1},p::ComponentVector{T},t::T)->CellFitElectrolyte.equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
+    func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
-    endT::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
+    endt::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
 
     for step::Int in 1:num_steps-1
         Temp = interpolated_temperature[step]
@@ -91,51 +88,81 @@ function evaluator(p::ComponentVector{T}) where {T}
         input_value = values[step]
         end_time::T = times[step+1]
         @pack! p = input_type,input_value
-        step!(integrator,end_time-integrator.t,true)
+        while integrator.t < times[step+1]
+            step!(integrator)
+        end
         endV[step] = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
-        endT[step] = Temp
+        endt[step] = integrator.t
     end
-
-    V_rmse::T = sqrt.(mean((endV.-interpolated_voltage[1:end-1]).^2))
-    T_rmse::T = sqrt.(mean((endT.-interpolated_temperature[1:end-1]).^2))
-    return endV,endT,integrator.sol.t
+    return endV
 end
 
-p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, n_li = 0.21, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
-params = CSV.read("results/outputs1211_full/$(VAH)_PARAM.csv",DataFrame)
-param_sym = Symbol.(names(params))
 
-for param in param_sym[1:end-3]
-    if param in keys(p)
-        p[param] = params[!,param][1]
-    end
+
+
+@model function fit_cfe(interpolated_voltage)
+    # Prior distributions.
+    n_li ~ truncated(Normal(0.2, 0.01), 0.18, 0.22)
+    ω ~ truncated(Normal(0.02, 0.001), 0.01, 0.05)
+    εₛ⁻ ~ Uniform(0.5, 0.75)
+    εₛ⁺ ~ Uniform(0.4, 0.6)
+    εᵧ⁺ ~ Uniform(0.0, 0.1)
+    εᵧ⁻ ~ Uniform(0.0, 0.1)
+
+    p = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, n_li = n_li, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    
+    
+    predicted = evaluator(p)
+
+    # Observations.
+    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+
+    return nothing
 end
 
-#=
-p.θₛ⁻ = 2e-8
-p.ω⁻ = 0.0001
-p.δ⁻ = 3.14e-9
-p.δ⁺ = 0
-p.εₛ⁻ = 0.6
-=#
-#p.δ⁻ = 1.15751e-7
-#p.ω = 0.05
-p.Eₛ⁻ = 0
-p.Eₑ = 0
-p.Eₛ⁺ = 000
 
-V,t = evaluator(p)
+model = fit_cfe(interpolated_voltage)
 
-V_rmse = sqrt.(mean((V.-interpolated_voltage[1:end-1]).^2))
-
-println("V_rmse:",V_rmse)
-
-
-using PythonPlot
-figure(1)
+# Sample 3 independent chains with forward-mode automatic differentiation (the default).
+chain = sample(model, DynamicNUTS(), 1000)
+εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
+εₛ⁺ = kde(chain[:εₛ⁺].data[:,1])
+εᵧ⁺ = kde(chain[:εᵧ⁺].data[:,1])
+εᵧ⁻ = kde(chain[:εᵧ⁻].data[:,1])
+ω = kde(chain[:ω].data[:,1])
+n_li = kde(chain[:n_li].data[:,1])
+figure(1);
 clf()
-plot(df.times,df.EcellV)
-plot(interpolated_time[1:end-1],V,"--")
-PythonPlot.yticks(2.4:0.4:4.2)
-legend(["Experiment", "Model"])
-PythonPlot.grid()
+plot(εₛ⁻.x, εₛ⁻.density)
+xlabel("εₛ⁻")
+ylabel("Density")
+
+figure(2);
+clf()
+plot(ω.x, ω.density)
+ylabel("Density")
+xlabel("SEI Resistance")
+
+figure(3);
+clf()
+plot(n_li.x,n_li.density)
+ylabel("Density")
+xlabel("Moles Li")
+
+figure(4);
+clf()
+plot(εₛ⁺.x,εₛ⁺.density)
+ylabel("Density")
+xlabel("εₛ⁺")
+
+figure(5);
+clf()
+plot(εᵧ⁺.x,εᵧ⁺.density)
+ylabel("Density")
+xlabel("εᵧ⁺")
+
+figure(6);
+clf()
+plot(εᵧ⁻.x,εᵧ⁻.density)
+ylabel("Density")
+xlabel("εᵧ⁻")

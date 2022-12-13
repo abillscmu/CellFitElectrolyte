@@ -38,7 +38,7 @@ function p_transport()
         E = 5000.0,
 
         #SEI
-        ω = 0.0001
+        ω = Normal(0.05, 0.01)
     )
 end
 
@@ -52,12 +52,12 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     c_p_init = x⁺₀*(cathodeocv.c_s_max-cathodeocv.c_s_min)
 
     @unpack Vₛ⁻,Vₛ⁺,Vₑ⁻,Vₑˢ,Vₑ⁺  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
+    @unpack εₛ⁻,εₛ⁺,εₑˢ,Temp = p
     @unpack R⁺,R⁻= p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻ 
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+    @unpack εᵧ⁺,εᵧ⁻ = p
+
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
 
     Veffₛ⁻ = εₛ⁻*Vₛ⁻
     Veffₛ⁺ = εₛ⁺*Vₛ⁺
