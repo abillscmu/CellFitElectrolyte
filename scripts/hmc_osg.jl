@@ -13,25 +13,28 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
-using PythonPlot
-pygui(true)
-using KernelDensity
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_500"
+VAH = ARGS[1]
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
-idx = findfirst(isequal(0),df.Ns)
-df = df[1:idx,:]
+filter!(row->row.Ns>=4,df)
+
+vfull = 4.2
+if cell==7
+	vfull=4.0
+elseif cell ==23
+	vfull=4.1
+end
 
 
 initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => df.TemperatureC[1].+273.15)
@@ -92,10 +95,6 @@ function evaluator(p::ComponentVector{T}) where {T}
         while integrator.t < times[step+1]
             step!(integrator)
         end
-        if any(integrator.u .< 0)
-            endV[step] = integrator.u[findfirst(integrator.u .< 0)]
-            continue
-        end
         endV[step] = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
         endt[step] = integrator.t
     end
@@ -107,9 +106,9 @@ end
 
 @model function fit_cfe(interpolated_voltage)
     # Prior distributions.
-    n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
+    n_li ~ truncated(Normal(0.2, 0.01), 0.18, 0.22)
     ω ~ truncated(Normal(0.02, 0.001), 0.01, 0.05)
-    εₛ⁻ ~ Uniform(0.6, 0.75)
+    εₛ⁻ ~ Uniform(0.5, 0.75)
     εₛ⁺ ~ Uniform(0.4, 0.6)
     εᵧ⁺ ~ Uniform(0.0, 0.1)
     εᵧ⁻ ~ Uniform(0.0, 0.1)
@@ -130,44 +129,7 @@ model = fit_cfe(interpolated_voltage)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
 chain = sample(model, DynamicNUTS(), 1000)
-εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
-εₛ⁺ = kde(chain[:εₛ⁺].data[:,1])
-εᵧ⁺ = kde(chain[:εᵧ⁺].data[:,1])
-εᵧ⁻ = kde(chain[:εᵧ⁻].data[:,1])
-ω = kde(chain[:ω].data[:,1])
-n_li = kde(chain[:n_li].data[:,1])
 
 
-
-figure(1);
-clf()
-subplot(321)
-plot(εₛ⁻.x, εₛ⁻.density)
-xlabel("εₛ⁻")
-ylabel("Density")
-grid()
-subplot(322)
-plot(ω.x, ω.density)
-ylabel("Density")
-xlabel("SEI Resistance")
-grid()
-subplot(323)
-plot(n_li.x,n_li.density)
-ylabel("Density")
-xlabel("Moles Li")
-grid()
-subplot(324)
-plot(εₛ⁺.x,εₛ⁺.density)
-ylabel("Density")
-xlabel("εₛ⁺")
-grid()
-subplot(325)
-plot(εᵧ⁺.x,εᵧ⁺.density)
-ylabel("Density")
-xlabel("εᵧ⁺")
-grid()
-subplot(326)
-plot(εᵧ⁻.x,εᵧ⁻.density)
-ylabel("Density")
-xlabel("εᵧ⁻")
-grid()
+JLD2.save("$(VAH)_HMC.jld2", Dict("chain"=>chain))
+sleep(5)
