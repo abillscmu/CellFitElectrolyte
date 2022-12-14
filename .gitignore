@@ -8,3 +8,6 @@ data/params.csv
 reports/figs
 reports/detailedreportVAH*
 outputs/
+*.eps
+*.pdf
+.CondaPkg/
