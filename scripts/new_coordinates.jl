@@ -22,13 +22,13 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_500"
-split1 = split(VAH,['H','_'])
-cell = parse(Int,split1[2])
-cycle = parse(Int,split1[3])
+VAH = "VAH01_20"
+#split1 = split(VAH,['H','_'])
+#cell = parse(Int,split1[2])
+#cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/home/abills/Data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 idx = findfirst(isequal(0),df.Ns)
 df = df[1:idx,:]
