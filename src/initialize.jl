@@ -55,6 +55,7 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     @unpack εₛ⁻,εₛ⁺,εₑˢ,Temp = p
     @unpack R⁺,R⁻= p
     @unpack εᵧ⁺,εᵧ⁻ = p
+    @unpack cₑ₀ = p
 
     εₑ⁻ = 1-εₛ⁻-εᵧ⁻
     εₑ⁺ = 1-εₛ⁺-εᵧ⁺
@@ -66,12 +67,12 @@ function initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     Veffₑ⁺ = εₑ⁺*Vₑ⁺
     Veffₑ = Veffₑ⁺ + Veffₑ⁻ + Veffₑˢ
 
-    total_li = p.n_li
+    #total_li = p.n_li
 
-    li_n_init = 2*c_n_init*Veffₛ⁻
-    li_p_init = 2*c_p_init*Veffₛ⁺
-    li_e_init = total_li - li_n_init - li_p_init
-    cₑ₀ = li_e_init / Veffₑ
+    #li_n_init = 2*c_n_init*Veffₛ⁻
+    #li_p_init = 2*c_p_init*Veffₛ⁺
+    #li_e_init = total_li - li_n_init - li_p_init
+    #cₑ₀ = li_e_init / Veffₑ
 
     u[1:2] .= c_n_init
     u[3:5] .= cₑ₀
