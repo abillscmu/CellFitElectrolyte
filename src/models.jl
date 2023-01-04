@@ -39,11 +39,11 @@ function equations_electrolyte(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     #Geometry
     @unpack R⁺,R⁻ = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
+    @unpack εᵧ⁺,εᵧ⁻ = p
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
+
 
     #Geometry
     a⁻ = 3*εₛ⁻/R⁻
@@ -187,20 +187,20 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp
 
     #Geometry
     @unpack R⁺,R⁻ = p
-    @unpack ω = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
+    @unpack εᵧ⁺,εᵧ⁻ = p
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
 
-    #Current Density
-    a⁻ = 3 .*εₛ⁻./R⁻
-    a⁺ = 3 .*εₛ⁺/R⁺
-    A⁻ = 2 .*Vₛ⁻.*a⁻
-    A⁺ = 2 .*Vₛ⁺.*a⁺
+
+    #Geometry
+    a⁻ = 3*εₛ⁻/R⁻
+    a⁺ = 3*εₛ⁺/R⁺
+    A⁻ = 2Vₛ⁻*a⁻
+    A⁺ = 2Vₛ⁺*a⁺
+
+
     J⁻ = Iapp./A⁻
     J⁺ = Iapp./A⁺
 
@@ -310,11 +310,11 @@ function equations_electrolyte_life(du,u,p,t,cache,cellgeometry,cathodeocv,anode
     #Geometry
     @unpack R⁺,R⁻ = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ = p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
+    @unpack εᵧ⁺,εᵧ⁻ = p
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
+
 
     #Geometry
     a⁻ = 3*εₛ⁻/R⁻
@@ -382,6 +382,17 @@ function equations_electrolyte_life(du,u,p,t,cache,cellgeometry,cathodeocv,anode
         du[8] = Iapp-input_value;
     elseif input_type==4
         du[8] = Iapp-0
+    elseif input_type==5
+        Voltage = U⁺-U⁻-η
+        if p.cccv_switch == true
+            if p.cccv_switch_2 == true
+                du[8] = Iapp - 0
+            else
+                du[8] = Voltage - p.vfull
+            end
+        else
+            du[8] = Iapp - input_value
+        end
     else
         @warn "condition not recognized"
         du[8] = Iapp-0
