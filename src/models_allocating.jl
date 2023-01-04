@@ -148,3 +148,124 @@ function get_eps_gamma_from_δ(R, δ, εₛ)
     εᵧ = 1 - εₑ - εₛ
     return εᵧ
 end
+
+
+function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
+    cₛˢ⁻,cₛᵇ⁻,cₑ⁻,cₑˢ,cₑ⁺,cₛᵇ⁺,cₛˢ⁺ = @view u[1:7]
+    @unpack Temp = p
+    @unpack input_type,input_value = p
+    Iapp = u[8]
+
+
+    #Transport Parameters
+    @unpack θₛ⁻,θₑ,θₛ⁺ = p
+    @unpack β⁻,βˢ,β⁺ = p
+    @unpack Eₛ⁺, Eₛ⁻, Eₑ = p
+    #Kinetic Parameters
+    @unpack k₀⁺,k₀⁻,ω = p
+    #Thermal Parameters
+    @unpack c,h = p
+    #Electrolyte Parameters
+    @unpack κ,t⁺ = p
+
+    #Geometry
+    @unpack R⁺,R⁻ = p
+    @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
+    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
+    @unpack εᵧ⁺,εᵧ⁻ = p
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
+
+
+    #Geometry
+    a⁻ = 3*εₛ⁻/R⁻
+    a⁺ = 3*εₛ⁺/R⁺
+    A⁻ = 2Vₛ⁻*a⁻
+    A⁺ = 2Vₛ⁺*a⁺
+    
+    J⁻ = Iapp/A⁻
+    J⁺ = Iapp/A⁺
+
+     
+    J⁻ = Iapp/A⁻
+    J⁺ = Iapp/A⁺
+
+    @fastmath pos = εₑ⁺^β⁺
+    @fastmath neg = εₑ⁻^β⁻
+
+    #Fill transport and apply bruggeman corrections (and temp later)
+    A_NS = SMatrix{2,2}(-θₛ⁻, θₛ⁻, θₛ⁻, -θₛ⁻) * exp(Eₛ⁻/293-Eₛ⁻/Temp)
+    A_PS = SMatrix{2,2}(-θₛ⁺, θₛ⁺, θₛ⁺, -θₛ⁺) * exp(Eₛ⁺/293-Eₛ⁺/Temp)
+    A_E = SMatrix{3,3}(-θₑ*neg, θₑ*neg, 0, θₑ*neg, -θₑ*(neg+pos), θₑ*pos, 0, θₑ*pos, -θₑ*pos) * exp(Eₑ/293-Eₑ/Temp)
+
+    du_NS = A_NS * (@view u[1:2])
+    du_E = A_E * (@view u[3:5])
+    du_PS = A_PS * (@view u[6:7])
+    du_transport = vcat(du_NS, du_E, du_PS)
+
+    #Apply current
+    cache_control = cache.controller*Iapp
+    du_pre_mm = du_transport + cache_control
+
+    mm_sn = 1/(cellgeometry.Vₛ⁻*εₛ⁻)
+    mm_sp = 1/(cellgeometry.Vₛ⁺*εₛ⁺)
+
+    mm = SVector(mm_sn, mm_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), mm_sp, mm_sp)
+
+    du[1:7] .= du_pre_mm .* mm
+ 
+
+    #Calculate Voltages
+    U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+    U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
+    
+    
+    J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
+    J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
+    
+    η₊ = butler_volmer(J₀⁺,J⁺,Temp)
+    η₋ = butler_volmer(J₀⁻,J⁻,Temp)
+    
+    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
+    
+    ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
+    ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+
+    ηₛ = sei_ohmic(ω, Iapp)
+
+    η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊-ηₛ
+
+
+        #Calculate Current
+    if input_type==0
+        du[8] = Iapp-0
+    elseif input_type==1
+        Voltage = U⁺-U⁻-η
+        du[8] = input_value-(Iapp*Voltage)
+    elseif input_type==2
+        Voltage = U⁺-U⁻-η
+        du[8] = input_value-Voltage 
+    elseif input_type==3
+        du[8] = Iapp-input_value;
+    elseif input_type==4
+        du[8] = Iapp-0
+    elseif input_type==5
+        Voltage = U⁺-U⁻-η
+        if p.cccv_switch == true
+            if p.cccv_switch_2 == true
+                du[8] = Iapp - 0
+            else
+                du[8] = Voltage - p.vfull
+            end
+        else
+            du[8] = Iapp - input_value
+        end
+    else
+        @warn "condition not recognized"
+        du[8] = Iapp-0
+    end
+    #Thermal Equations
+    return nothing
+end
+
