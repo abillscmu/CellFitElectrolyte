@@ -11,3 +11,4 @@ outputs/
 *.eps
 *.pdf
 .CondaPkg/
+figs/
