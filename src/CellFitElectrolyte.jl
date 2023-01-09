@@ -13,6 +13,7 @@ using FileIO
 using JLD2
 using DataInterpolations
 using PreallocationTools
+using DiffEqFlux
 using Turing
 using DynamicHMC
 
@@ -24,6 +25,7 @@ include("initialize.jl")
 include("inputbuilder.jl")
 include("SimulatedAnnealing.jl")
 include("models_allocating.jl")
+include("degradation_nn.jl")
 
 export simulate,initialize
 end # module

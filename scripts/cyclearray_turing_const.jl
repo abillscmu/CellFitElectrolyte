@@ -15,14 +15,19 @@ using Statistics
 using JLD2
 
 
+#DELETE
+using BenchmarkTools
+
+
 #set up simulation
 cache = CellFitElectrolyte.initialize_cache(Float64)
-cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
+const cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
 #Parse Arguments
-VAH = "VAH01_200"
+#FIX
+VAH = "VAH01_2"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -31,6 +36,7 @@ cycle = parse(Int,split1[3])
 df = CSV.read("/Users/abills/Datasets/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 filter!(row->row.Ns>=4,df)
+const startT = df.TemperatureC[1]
 
 #Set Full Voltage (100%SOC)
 vfull = 4.2
@@ -45,22 +51,43 @@ vfull = initialcond["Starting Voltage[V]"]
 #set up cycle arrays
 cycle_array_vector = CellFitElectrolyte.load_airbus_cyclearrays()
 cycle_array_vec = cycle_array_vector["cycle_array_vector"][cell]
-cycle_array = cycle_array_vec[cycle]
-cycle_array = CellFitElectrolyte.truncate_cycle_array(5, cycle_array)
-num_steps = Int(cycle_array[1])
-times = cycle_array[2:num_steps+1]
-types = cycle_array[num_steps+2:num_steps+1+num_steps]
-values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
+cycle_array_new = cycle_array_vec[cycle]
+const cycle_array = CellFitElectrolyte.truncate_cycle_array(5, cycle_array_new)
+const num_steps = Int(cycle_array[1])
+const times = cycle_array[2:num_steps+1]
+const types = cycle_array[num_steps+2:num_steps+1+num_steps]
+const values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
+const tstops = times
+
+
+#Mass Matrix
+vars = ones(8)
+vars[8] = 0
+const mm = diagm(vars)
+
+
+# Initial Parameters and Initial Condition
+p = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.75, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch_2 = false, cccv_switch = false, vfull = 4.2, ifull = -0.05)
+u = Array{Float64,1}(undef,8)
+input_type = types[1]
+input_value = values[1]
+@pack! p = input_type,input_value
+Temp = df.TemperatureC[1] .+ 273.15
+@pack! p = Temp
+CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
+du = similar(u)
+func = ODEFunction(( du, u, p, t)->CellFitElectrolyte.equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv), mass_matrix=mm)
+prob = ODEProblem(func,u,(0.0,times[end]),p)
+
+
+
+
+
+
 
 function cycle_array_evaluator(p::ComponentVector{T}) where {T}
-    #Prep Cycle Array
-    num_steps = Int(cycle_array[1])
-    times = cycle_array[2:num_steps+1]
-    types = cycle_array[num_steps+2:num_steps+1+num_steps]
-    values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
 
-    #Initialize data
-    tstops = df.times
+    #Initialize Data
     endV = Array{T, 1}(undef, length(df.times))
 
     # Handle Initial Conditions
@@ -68,28 +95,13 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
     input_type::T = types[1]
     input_value::T = values[1]
     @pack! p = input_type,input_value
-    Temp = df.TemperatureC[1] .+ 273.15
+    Temp = startT .+ 273.15
     @pack! p = Temp
     CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
     du = similar(u)
-    u[8] = 10.0
-
-    #Mass Matrix
-    vars = ones(8)
-    vars[8] = 0
-    mm = diagm(vars)
 
     #Create Function and Initialize Integrator
-    func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv), mass_matrix=mm)
-    prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = try
-        integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops=tstops, verbose=false)
-    catch
-        endV = 100 .*ones(length(endV))
-        return endV
-    end
-    default_dtmax = integrator.opts.dtmax
-    integrator.opts.dtmax = 5.0
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops=tstops, verbose=false, p=p, u0=u)
     integrator.opts.maxiters = 1e7
 
     #Iterate through each data point
@@ -104,12 +116,11 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
         error("lifetime is not supported by this simulator")
     else
         for step::Int in 1:num_steps-1
-            println(step)
             #Calculate Voltage and Save
-            cₛˢ⁺ = integrator.u[7]
-            cₛˢ⁻ = integrator.u[1]
-            x⁺ = (cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min)
-            x⁻ = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
+            cₛˢ⁺::T = integrator.u[7]
+            cₛˢ⁻::T = integrator.u[1]
+            x⁺::T = (cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min)
+            x⁻::T = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
             if (x⁺ >= 1)
                 endV[step] = 50*x⁺
                 continue
@@ -117,13 +128,8 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
                 endV[step] = 50*x⁻
                 continue
             end
-            Voltage = try
-                Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
-                endV[step] = Voltage
-            catch
-                endV[step] = -50
-                continue
-            end
+            Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+            endV[step] = Voltage
 
             #Set Temperature
             Temp = df.TemperatureC[step+1].+273.15
@@ -139,12 +145,12 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
             #Ensure integrator is going to find a happy place
             @pack! p = input_type,input_value
             if (input_type == 0.0) | (input_type == 5.0)
-                u = deepcopy(integrator.u)
+                u = integrator.u
                 u[8] = input_value
                 OrdinaryDiffEq.set_u!(integrator, u)
                 #integrator.opts.dtmax = 1.0
             elseif input_type == 1.0
-                u = deepcopy(integrator.u)
+                u = integrator.u
                 u[8] = input_value/Voltage
                 OrdinaryDiffEq.set_u!(integrator, u)
             end
@@ -165,21 +171,18 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
                     end
                 end
             #catch
-            #        continue
+            #    endV[step] = -50
+            #    continue
             #end
         end
 
         #Save final voltage
-        try
-            Voltage = CellFitElectrolyte.calc_voltage(integrator.u, integrator.p, integrator.t, cache, cellgeometry, cathodeocv, anodeocv, integrator.u[8])
-            endV[end] = Voltage
-        catch
-            endV[end] = -50
-        end
+        Voltage = CellFitElectrolyte.calc_voltage(integrator.u, integrator.p, integrator.t, cache, cellgeometry, cathodeocv, anodeocv, integrator.u[8])
+        endV[end] = Voltage
     end
     return endV
 end
-
+#=
 #Default Parameter Value
 @model function fit_cfe(voltage)
     # Prior distributions.
@@ -212,38 +215,19 @@ end
 
 model = fit_cfe(df.EcellV)
 
-p = ComponentVector{Float64}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.7500861154034334, εₛ⁺ = 0.45039623350809316, δ⁻ = 3.815600768773315e-8, δ⁺ = 4.170570135429523e-8, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, n_li = 0.21, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, εᵧ⁺=0, εᵧ⁻=0, E_SEI = 1000, cccv_switch=false, cccv_switch_2 = false, vfull = 4.2, ifull = -0.01)
-params = CSV.read("results/outputs1211_full/$(VAH)_PARAM.csv",DataFrame)
-param_sym = Symbol.(names(params))
-
-for param in param_sym[1:end-3]
-    if param in keys(p)
-        p[param] = params[!,param][1]
-    end
-end
-
-
-
-p[:εᵧ⁺] = 0.1
-p[:εᵧ⁻] = 0.1
-p.ω = 0.026
-
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
-#chain = sample(model, MH(), 1000)
+chain = sample(model, IS(), 1000, progress=false)
 
 
-#d = Dict("chain" => chain)
+d = Dict("chain" => chain)
 
 
-#save("$(VAH)_HMC.jld2", d)
-#sleep(5)
-V = cycle_array_evaluator(p)
-
-figure(1)
-pygui(true)
-clf()
-plot(df.times, V)
-plot(df.times, df.EcellV)
+save("$(VAH)_HMC.jld2", d)
+sleep(5)
+=#
 
 
 
+b = @benchmark cycle_array_evaluator(p)
+
+println(b)
