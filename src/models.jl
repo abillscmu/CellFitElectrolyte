@@ -146,6 +146,23 @@ function sei_ohmic(ω,Iapp)
     return η_sei
 end
 
+function sei_growth(c_s_bulk, k_sei, α_sei, Temp, η_sei, εᵧ, D_sei, R, V)
+    kinetic_growth = CellFitElectrolyte.F*k_sei*exp(-α_sei*CellFitElectrolyte.F*η_sei/(CellFitElectrolyte.R*Temp))
+    δ_sei = get_δ_from_eps_gamma(R, εᵧ, V)
+    diffusive_growth = δ_sei / (CellFit.F * D_sei)
+    i_sei = c_s_bulk / ((1 / kinetic_growth) + (1 / diffusive_growth))
+    return i_sei
+end
+
+function sei_δ_growth(i_sei, M_sei, ρ_sei)
+    δ̇ = i_sei * M_sei / (ρ_sei * CellFitElectrolyte.F)
+    return δ̇
+end
+
+function vol_frac_change(β_ε_sei, i_sei)
+    return - β_ε_sei * i_sei
+end
+
 
 function exchange_current_density(cₛ,cₑ,c_s_max,k₀)
     J₀ = k₀.*sqrt.(cₑ.*(c_s_max.-cₛ).*cₛ)

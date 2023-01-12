@@ -22,7 +22,9 @@ num_layers = 1
 activation = tanh
 width = 2
 num_augmented_states = 0
-predicted_states = [:ω]
+#legacy
+predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
+
 
 #set up neural network (derived)
 num_predicted_states = length(predicted_states)
@@ -38,30 +40,37 @@ initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
 vfull = initialcond["Starting Voltage[V]"]
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
-p = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
+p = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0,εₑ⁻ = 0, εₑ⁺ = 0, frac_sol_am_pos=0, frac_sol_am_neg=0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
 p_nn_init = DiffEqFlux.initial_params(nn)
 
 #Problem is now built. Next step is to load data. This section roughly corresponds to batch settings.
 cell = 1
 first_cycle = 2
-last_cycle = 4
+last_cycle = 3
 
 
 #Load data
-FOLDERNAME = "results/outputs1214_nuts_vah01/"
+FOLDERNAME = "results/outputs0106_fullcyc/"
 vah = lpad(cell, 2, "0")
 first_chain = load(FOLDERNAME*"VAH$(vah)_$(first_cycle)_HMC.jld2")["chain"]
 last_chain = load(FOLDERNAME*"VAH$(vah)_$(last_cycle)_HMC.jld2")["chain"]
 
 #Build Distributions
-first_distribution_data = first_chain[:ω].data[:,1]
-last_distribution_data = last_chain[:ω].data[:,1]
-first_distribution_kde = kde(first_distribution_data)
-last_distribution_kde = kde(last_distribution_data)
-first_distribution_bw = KernelDensity.default_bandwidth(first_distribution_data)
-last_distribution_bw = KernelDensity.default_bandwidth(last_distribution_data)
-first_distribution = KDEDistribution(first_distribution_data, first_distribution_kde, first_distribution_bw)
-last_distribution = KDEDistribution(last_distribution_data, last_distribution_kde, last_distribution_bw)
+distribution_dict = Dict()
+
+for sym in predicted_states
+    first_distribution_data = first_chain[sym].data[:,1]
+    last_distribution_data = last_chain[sym].data[:,1]
+    first_distribution_kde = kde(first_distribution_data)
+    last_distribution_kde = kde(last_distribution_data)
+    first_distribution_bw = KernelDensity.default_bandwidth(first_distribution_data)
+    last_distribution_bw = KernelDensity.default_bandwidth(last_distribution_data)
+    first_distribution = KDEDistribution(first_distribution_data, first_distribution_kde, first_distribution_bw)
+    last_distribution = KDEDistribution(last_distribution_data, last_distribution_kde, last_distribution_bw)
+    distribution_dict[sym] = Dict()
+    distribution_dict[sym]["Initial"] = first_distribution
+    distribution_dict[sym]["Final"] = last_distribution
+end
 
 #Load CycleArrays
 cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"][cell][first_cycle:last_cycle]
@@ -101,7 +110,7 @@ function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, u) where {T}
             input_type = 3.0
             input_value = cycle_array[2]
             @pack! integrator.p.p_phys = input_type, input_value
-            Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p.p_phs,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+            Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p.p_phys,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
             u = deepcopy(integrator.u)
             u[8] = input_value
             OrdinaryDiffEq.set_u!(integrator, u)
@@ -196,35 +205,40 @@ end
 
 
 
-@model function fit_bw(first_distribution, last_distribution, cycle_array_vec, p_phys, nn)
+function sample_from_chain(distribution_dict, cycle_array_vec, p_phys, chain)
         # Handle Initial Conditions
         u = zeros(8)
         CellFitElectrolyte.initial_conditions!(u,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         augmented_states = zeros(num_augmented_states)
-        ω ~ first_distribution
-        p_nn ~ MvNormal(zeros(length(initial_params(nn))), 1e-10)
-        p = ComponentArray(p_phys = p_phys, p_nn = p_nn)
-        u = vcat(u, ω, augmented_states)
         
-        Temp = 320.0
-        @pack! p.p_phys = Temp
-        input_type = 0
-        input_value = 0
-        @pack! p.p_phys = input_type,input_value
-        
-        #Simulate
-        new_u = lifetime_evaluator(p, cycle_array_vec, u)
+        ω = mean(distribution_dict[:ω]["Initial"].data)
+        εₑ⁻ = mean(distribution_dict[:εₑ⁻]["Initial"].data)
+        εₑ⁺ = mean(distribution_dict[:εₑ⁺]["Initial"].data)
+        frac_sol_am_neg = mean(distribution_dict[:frac_sol_am_neg]["Initial"].data)
+        frac_sol_am_pos = mean(distribution_dict[:frac_sol_am_pos]["Initial"].data)
+        u = vcat(u, ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
 
-        #Evaluate
-        ω_out = new_u[9]
-        probability = Distributions.logpdf(last_distribution, ω_out)
-        Turing.Turing.@addlogprob! probability
+        df = DataFrame(chain)
+        outu = []
+
+        for row in eachrow(df)
+            p_nn = Vector(row)[3:end-1]
+            println(length(p_nn))
+            p = ComponentArray(p_phys = p_phys, p_nn = p_nn)
+            
         
-        return nothing
+            Temp = 320.0
+            @pack! p.p_phys = Temp
+            input_type = 0
+            input_value = 0
+            @pack! p.p_phys = input_type,input_value
+        
+            #Simulate
+            new_u = lifetime_evaluator(p, cycle_array_vec, u)
+            push!(outu, new_u)
+        end
+        return outu
 end
 
-model = fit_bw(first_distribution, last_distribution, cycle_array_vec, p, nn)
-
-chain = sample(model, PG(10), 1000)
 
 

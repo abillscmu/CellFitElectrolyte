@@ -149,6 +149,12 @@ function get_eps_gamma_from_δ(R, δ, εₛ)
     return εᵧ
 end
 
+function get_δ_from_eps_gamma(R, εᵧ, V)
+    Vᵧ = εᵧ*V
+    δ = ((R^3)*Vᵧ+(R^3))-R
+    return δ
+end
+
 
 function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     cₛˢ⁻,cₛᵇ⁻,cₑ⁻,cₑˢ,cₑ⁺,cₛᵇ⁺,cₛˢ⁺ = @view u[1:7]
