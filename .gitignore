@@ -12,3 +12,4 @@ outputs/
 *.pdf
 .CondaPkg/
 figs/
+*.jld2
