@@ -17,6 +17,7 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using BenchmarkTools
 
 #set up neural network (inputs)
 num_layers = 2
@@ -29,7 +30,7 @@ predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_po
 
 #set up neural network (derived)
 num_predicted_states = length(predicted_states)
-const input_dim = 7 + num_predicted_states + num_augmented_states
+input_dim = 7 + num_predicted_states + num_augmented_states
 output_dim = num_predicted_states + num_augmented_states
 nn = CellFitElectrolyte.build_nn(num_layers, activation, width, input_dim, output_dim)
 
@@ -195,7 +196,7 @@ function evaluator(p::ComponentVector{T}, cycle_array_vec, interpolated_vectors_
         return nothing
     end
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,Rodas5(autodiff=false),save_everystep=false)
+    integrator = init(prob,Rosenbrock23(),save_everystep=false)
     integrator.opts.maxiters=1e7
 
     #we're really only interested in temperature and voltage, so we'll just save those
@@ -214,12 +215,12 @@ function evaluator(p::ComponentVector{T}, cycle_array_vec, interpolated_vectors_
         interpolated_vectors = interpolated_vectors_vec[v]
 
         num_steps = Int(cycle_array[1])
-        times = cycle_array[2:num_steps+1]
+        times = @view cycle_array[2:num_steps+1]
         for t in times[2:end]
             add_tstop!(integrator, t)
         end
-        types = cycle_array[num_steps+2:num_steps+1+num_steps]
-        values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
+        types = @view cycle_array[num_steps+2:num_steps+1+num_steps]
+        values = @view cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
         
         interpolated_temperature = interpolated_vectors["Temperature"]
         set_t!(integrator, times[1])
@@ -280,45 +281,22 @@ p_phys = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.646406855278
 
 p_nn = initial_params(nn)
 
-@model function fit_nn(cycle_array_vec, interpolated_vectors_vec, distribution_dict)
-    p_nn ~ MvNormal(zeros(length(initial_params(nn))), 1e-9)
+p_nn = zeros(length(initial_params(nn))) 
 
-    ω = rand(distribution_dict[:ω]["Initial"])
-    εₑ⁻ = rand(distribution_dict[:εₑ⁻]["Initial"])
-    εₑ⁺ = rand(distribution_dict[:εₑ⁺]["Initial"])
-    frac_sol_am_neg = rand(distribution_dict[:frac_sol_am_neg]["Initial"])
-    frac_sol_am_pos = rand(distribution_dict[:frac_sol_am_pos]["Initial"])
+ω = rand(distribution_dict[:ω]["Initial"])
+εₑ⁻ = rand(distribution_dict[:εₑ⁻]["Initial"])
+εₑ⁺ = rand(distribution_dict[:εₑ⁺]["Initial"])
+frac_sol_am_neg = rand(distribution_dict[:frac_sol_am_neg]["Initial"])
+frac_sol_am_pos = rand(distribution_dict[:frac_sol_am_pos]["Initial"])
 
-    εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
-    εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
-    εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
-    εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
+εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
+εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
+εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
+εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p_phys = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+p_phys = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
 
-    ics = ComponentVector(ω=ω, εₑ⁻=εₑ⁻, εₑ⁺=εₑ⁺, frac_sol_am_neg=frac_sol_am_neg, frac_sol_am_pos=frac_sol_am_pos)
-    p = ComponentVector(p_nn = p_nn, p_phys = p_phys, ics=ics)
-    u_out = evaluator(p, cycle_array_vec, interpolated_vectors_vec)
+ics = ComponentVector(ω=ω, εₑ⁻=εₑ⁻, εₑ⁺=εₑ⁺, frac_sol_am_neg=frac_sol_am_neg, frac_sol_am_pos=frac_sol_am_pos)
+p = ComponentVector(p_nn = p_nn, p_phys = p_phys, ics=ics)
 
-    ω_out, εₑ⁻_out, εₑ⁺_out, frac_sol_am_neg_out, frac_sol_am_pos_out  = u_out[8:12]
-
-
-    probability_ω = Distributions.logpdf(distribution_dict[:ω]["Final"], ω_out)
-    probability_εₑ⁻ = Distributions.logpdf(distribution_dict[:εₑ⁻]["Final"], εₑ⁻_out)
-    probability_εₑ⁺ = Distributions.logpdf(distribution_dict[:εₑ⁺]["Final"], εₑ⁺_out)
-    probability_frac_sol_am_neg = Distributions.logpdf(distribution_dict[:frac_sol_am_neg]["Final"], frac_sol_am_neg_out)
-    probability_frac_sol_am_pos = Distributions.logpdf(distribution_dict[:frac_sol_am_pos]["Final"], frac_sol_am_pos_out)
-
-    Turing.@addlogprob! probability_ω
-    Turing.@addlogprob! probability_εₑ⁻
-    Turing.@addlogprob! probability_εₑ⁺
-    Turing.@addlogprob! probability_frac_sol_am_neg
-    Turing.@addlogprob! probability_frac_sol_am_pos
-    return nothing
-end
-
-model = fit_nn(cycle_array_vec, interpolated_vectors_vec, distribution_dict)
-
-chain = sample(model, MH(), 1000)
-
-
+@benchmark u_out = evaluator(p, cycle_array_vec, interpolated_vectors_vec)

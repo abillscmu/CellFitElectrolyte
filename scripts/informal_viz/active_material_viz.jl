@@ -1,29 +1,39 @@
-function get_n_li_from_u_and_p(u, p)
-    cₛˢ⁻ = u[1]
-    cₛᵇ⁻ = u[2]
-    cₑ⁻ = u[3]
-    cₑˢ = u[4]
-    cₑ⁺ = u[5]
-    cₛᵇ⁺ = u[6]
-    cₛˢ⁺ = u[7]
+using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
+np = pyimport("numpy")
 
-    @unpack Vₛ⁻,Vₛ⁺,Vₑ⁻,Vₑˢ,Vₑ⁺  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,δ⁻,δ⁺,εₑˢ,Temp = p
-    @unpack R⁺,R⁻= p
-    X⁺ = ((R⁺+δ⁺)^3-R⁺^3)/(R⁺^3)
-    X⁻ = ((R⁻+δ⁻)^3-R⁻^3)/(R⁻^3)
-    εₑ⁻ = 1-(1+X⁻)εₛ⁻ 
-    εₑ⁺ = 1-(1+X⁺)εₛ⁺
+FOLDERNAME = "results/outputs0106_fullcyc/"
+CELL = "VAH01"
 
-    Veffₛ⁻ = εₛ⁻*Vₛ⁻
-    Veffₛ⁺ = εₛ⁺*Vₛ⁺
-    Veffₑ⁻ = εₑ⁻*Vₑ⁻
-    Veffₑˢ = εₑˢ*Vₑˢ
-    Veffₑ⁺ = εₑ⁺*Vₑ⁺
-    
-    n_li_m = Veffₛ⁻*cₛˢ⁻ + Veffₛ⁻*cₛᵇ⁻ + Veffₑ⁻*cₑ⁻ + Veffₑˢ*cₑˢ + Veffₑ⁺*cₑ⁺ + Veffₛ⁺*cₛˢ⁺ + Veffₛ⁺*cₛᵇ⁺
+val = []
+cyc = []
 
-    return n_li_m
+figure(1)
+clf()
+
+
+
+for cell in 0:2500
+    cell_to_load = "$(FOLDERNAME)$(CELL)_$(cell)_HMC.jld2"
+    chain = try
+        d = load(cell_to_load)
+        chain = d["chain"]
+        εₑ⁻ = chain[:εₑ⁻].data[:, 1]
+        frac_sol_am_neg = chain[:frac_sol_am_neg].data[:, 1]
+        εₛ⁻ = (1 .- εₑ⁻).*frac_sol_am_neg
+        append!(val, εₛ⁻)
+        append!(cyc, cell*ones(1000))
+    catch
+        @warn "problem with $cell"
+        continue
+    end
 end
 
+figure(1)
+clf()
+hist2D(cyc, val, bins=100)
+colorbar(label="Density")
+grid(alpha=0.8)
+xlabel("Cycle Number")
+ylabel("active material")
+title("Series: $CELL")
 
