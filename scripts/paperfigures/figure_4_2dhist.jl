@@ -2,9 +2,9 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs0112_elec/"
+FOLDERNAME = "results/outputs0114_elec/"
 CELLS = ["VAH01"]
-SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :c_e_0]
+SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg]
 
 
 
@@ -13,7 +13,7 @@ clf()
 
 num_rows = length(CELLS)
 num_cols = length(SYMBOLS)
-
+  
 for (i,CELL) in enumerate(CELLS)
     for (j, SYMBOL) in enumerate(SYMBOLS)
         val = []

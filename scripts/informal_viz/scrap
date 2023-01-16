@@ -1,0 +1,43 @@
+
+        if type==0
+            input_value = 0
+        elseif type==1
+            input_value = value/Voltage
+        elseif type==2
+            error("can't do this")
+        elseif type==3
+            input_value = value;
+        elseif type==4
+            input_value = value
+        elseif type==5
+            value = input_value
+        end
+        input_value = input_value
+
+
+
+                
+        idx = searchsortedlast(new_times, integrator.t)
+        type = new_types[idx]
+        value = new_values[idx]
+        #calculate voltage on first step
+        if step == 1
+            if any(integrator.u .< 0)
+                endV[step] = integrator.u[findfirst(integrator.u .< 0)]
+                continue
+            end
+            cₛˢ⁺ = integrator.u[7]
+            cₛˢ⁻ = integrator.u[1]
+            x⁺ = (cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min)
+            x⁻ = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
+            if (x⁺ >= 1)
+                endV[step] = 50*x⁺
+                continue
+            elseif (x⁻ >= 1)
+                endV[step] = 50*x⁻
+                continue
+            end
+            Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
+        else
+            Voltage = endV[step-1]
+        end
