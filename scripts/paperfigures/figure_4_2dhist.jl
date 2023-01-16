@@ -2,9 +2,9 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs0106_fullcyc/"
-CELLS = ["VAH27", "VAH28", "VAH30"]
-SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg]
+FOLDERNAME = "results/outputs0112_elec/"
+CELLS = ["VAH01"]
+SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :c_e_0]
 
 
 

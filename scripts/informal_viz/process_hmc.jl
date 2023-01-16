@@ -2,7 +2,7 @@ using Turing, DynamicHMC, PythonPlot, JLD2, KernelDensity, DataFrames, PythonCal
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs1214_nuts_vah01/"
+FOLDERNAME = "results/outputs0106_fullcyc/"
 
 figure(1)
 clf()
@@ -13,9 +13,12 @@ n_li_upper_bound = []
 n_li_50 = []
 mle_vec = []
 
-sym = :ω
-
+sym = :εₑ⁻
+vah = "VAH01"
 cell = for file in readdir(FOLDERNAME)
+    if !occursin(vah, file)
+        continue
+    end
     filename = FOLDERNAME * file
     arr = parse(Int, split(split(file, "VAH")[2],"_")[1])
     if arr == 2
@@ -50,7 +53,7 @@ figure(1);
 #clf()
 fill_between(np.array(pyfloat.(sorted_df.cells),dtype=np.float),np.array(pyfloat.(sorted_df.lower_bound),dtype=np.float),np.array(pyfloat.(sorted_df.upper_bound),dtype=np.float), facecolor="grey", alpha = 1)
 plot(sorted_df.cells, sorted_df.mid,"b")
-#plot(sorted_df.cells, sorted_df.mle, "g")
+plot(sorted_df.cells, sorted_df.mle, "g")
 legend(["95%","Median"])
 xlabel("Cycle")
 ylabel(string(sym))
