@@ -144,7 +144,7 @@ end
 ####################################################################################################
 # Function call with upper and lower bounds and logarithmic 
 ####################################################################################################
-function anneal_log(loss::Function, parent, ub, lb; λ = 1/100., options::annealOptions = annealOptions( 1., 1000, 2000, 3000, 1e-8, -Inf, 1))
+function anneal_log(loss::Function, parent, ub, lb; λ = 1/100., options::annealOptions = annealOptions( 1., 1000, 2000, 3000, 1e-8, -Inf, 2))
     # Search function for new set of parameters
     function newsol(input, ub, lb)
         # (x.+(randperm(length(x))==length(x))*randn()/100)
