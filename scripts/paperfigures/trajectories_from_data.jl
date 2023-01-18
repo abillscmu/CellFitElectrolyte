@@ -13,6 +13,7 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using PythonPlot
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
@@ -32,11 +33,11 @@ for (i,c) in enumerate(CELLS)
     for (j, cycle) in enumerate(CYCLES[i])
     VAH = c*"_$cycle"
     split1 = split(VAH,['H','_'])
-    cell = parse(Int,split1[2])
+    cell = parse(Int,split1[2]) 
     cycle = parse(Int,split1[3])
 
 
-df = CSV.read("/Users/abills/Datasets/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/home/abills/Data/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 filter!(row->row.Ns>=4,df)
 
@@ -132,7 +133,7 @@ end
 
 thing = []
 
-chain = load("results/outputs0112_elec/$(VAH)_HMC.jld2")["chain"]
+chain = load("results/outputs0114_elec/$(VAH)_HMC.jld2")["chain"]
 params = DataFrame(chain)
 for n in 1:size(params)[1]
     frac_sol_am_neg = params.frac_sol_am_neg[n]
@@ -140,7 +141,7 @@ for n in 1:size(params)[1]
     εₑ⁺ = params.εₑ⁺[n]
     εₑ⁻ = params.εₑ⁻[n]
     x⁻₀ = 0.6
-    ω = 0.0
+    ω = params.ω[n]
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos

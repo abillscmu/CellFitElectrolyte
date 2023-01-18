@@ -148,14 +148,29 @@ end
 
 function sei_growth(c_s_bulk, k_sei, α_sei, Temp, η_sei, D_sei, δ)
     kinetic_growth = CellFitElectrolyte.F*k_sei*exp(-α_sei*CellFitElectrolyte.F*η_sei/(CellFitElectrolyte.R*Temp))
-    diffusive_growth = δ / (CellFit.F * D_sei)
-    i_sei = c_s_bulk / ((1 / kinetic_growth) + (1 / diffusive_growth))
+    diffusive_growth = δ / (CellFitElectrolyte.F * D_sei)
+    i_sei = c_s_bulk / ((1 / kinetic_growth) + diffusive_growth)
     return i_sei
 end
 
 function sei_delta_growth(I_sei, δ, R, εₑ, Vₘ)
-    δ̇ = ((R + δ)/(3*(1-εₑ)))*(I_sei/2*CellFitElectroltyte.F)*Vₘ
+    δ̇ = ((R + δ)/(3*(1-εₑ)))*(I_sei/2*CellFitElectrolyte.F)*Vₘ
     return δ̇
+end
+
+function plating(j0_pl, a, α_pl, Temp, η_pl)
+    i_pl = a*j0_pl*exp(-α_pl*CellFitElectrolyte.F*η_pl/(CellFitElectrolyte.R*Temp))
+    return i_pl
+end
+
+function active_material_dissolution(i0_diss, a, α_diss, Temp, η_diss)
+    i_diss = a*i0_diss*exp(-α_diss*CellFitElectrolyte.F*η_diss/(CellFitElectrolyte.R*Temp))
+    return i_diss
+end
+
+function active_material_dissolution_volfrac(i_diss, q, n)
+    dvolfrac_dt = i_diss/(CellFitElectrolyte.F*q*n)
+    return dvolfrac_dt
 end
 
 
