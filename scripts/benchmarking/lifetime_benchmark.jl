@@ -196,7 +196,7 @@ function evaluator(p::ComponentVector{T}, cycle_array_vec, interpolated_vectors_
         return nothing
     end
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,Rosenbrock23(),save_everystep=false)
+    integrator = init(prob,QNDF(),save_everystep=false)
     integrator.opts.maxiters=1e7
 
     #we're really only interested in temperature and voltage, so we'll just save those

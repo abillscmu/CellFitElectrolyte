@@ -6,6 +6,7 @@ using CellFitElectrolyte.Parameters
 using CellFitElectrolyte.DataInterpolations
 using CellFitElectrolyte.DiffEqFlux
 using CellFitElectrolyte.Turing
+using BenchmarkTools
 using StaticArrays
 using CSV
 using DataFrames
@@ -81,6 +82,7 @@ function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, u) where {T}
     Temp = 320
     c_s_p_max = cathodeocv.c_s_max
     c_s_n_max = anodeocv.c_s_max
+    
     function f(du, u, p, t)
         @unpack p_nn, p_phys = p
         #for (i, param) in enumerate(predicted_states)
@@ -88,7 +90,7 @@ function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, u) where {T}
         #end
         CellFitElectrolyte.equations_electrolyte_life_allocating((@view du[1:8]), (@view u[1:8]), p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
 
-        
+        #=
         xₛˢ⁻ = (u[1])/(c_s_n_max)
         xₛᵇ⁻ = (u[2])/(c_s_n_max)
         xₑ⁻ = u[3] / p_phys.cₑ₀
@@ -103,10 +105,10 @@ function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, u) where {T}
         εₑ⁺ = (u[10] - 0.05)/0.45
         frac_sol_am_neg = (u[11] - 0.5)/0.5
         frac_sol_am_pos = (u[12] - 0.5)/0.5
-        
-        u_in = SVector(xₛˢ⁻, xₛᵇ⁻, xₑ⁻, xₑˢ, xₑ⁺, xₛᵇ⁺, xₛˢ⁺, I_app, ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
-        new_u = nn(u_in, p_nn)
-        du[9:end] .= new_u
+        =#
+        #u_in = SVector(xₛˢ⁻, xₛᵇ⁻, xₑ⁻, xₑˢ, xₑ⁺, xₛᵇ⁺, xₛˢ⁺, I_app, ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
+        #new_u = nn(u_in, p_nn)
+        du[9:end] .= 0
         return nothing
     end
 

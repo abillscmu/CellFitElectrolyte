@@ -1,8 +1,8 @@
 using Turing, DynamicHMC, PythonPlot, JLD2, KernelDensity, DataFrames, PythonCall, CellFitElectrolyte, CellFitElectrolyte.OCV
 np = pyimport("numpy")
-pygui(true)
+#pygui(true)
 
-FOLDERNAME = "results/outputs0114_elec/"
+FOLDERNAME = "results/outputs0106_fullcyc/"
 
 figure(1)
 clf()

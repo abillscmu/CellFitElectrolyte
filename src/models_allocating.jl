@@ -192,10 +192,6 @@ function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,catho
     J⁻ = Iapp/A⁻
     J⁺ = Iapp/A⁺
 
-     
-    J⁻ = Iapp/A⁻
-    J⁺ = Iapp/A⁺
-
     @fastmath pos = εₑ⁺^β⁺
     @fastmath neg = εₑ⁻^β⁻
 
@@ -219,37 +215,53 @@ function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,catho
     mm = SVector(mm_sn, mm_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), mm_sp, mm_sp)
 
     du[1:7] .= du_pre_mm .* mm
- 
-
-    #Calculate Voltages
-    U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
-    U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
-    
-    
-    J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
-    J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
-    
-    η₊ = butler_volmer(J₀⁺,J⁺,Temp)
-    η₋ = butler_volmer(J₀⁻,J⁻,Temp)
-    
-    ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
-    ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
-    
-    ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
-    ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
-
-    ηₛ = sei_ohmic(ω, Iapp)
-
-    η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊-ηₛ
-
 
         #Calculate Current
     if input_type==0
         du[8] = Iapp-0
     elseif input_type==1
+            #Calculate Voltages
+        U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+        U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
+    
+    
+        J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
+        J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
+    
+        η₊ = butler_volmer(J₀⁺,J⁺,Temp)
+        η₋ = butler_volmer(J₀⁻,J⁻,Temp)
+    
+        ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+        ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
+    
+        ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
+        ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+
+        ηₛ = sei_ohmic(ω, Iapp)
+
+        η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊+ηₛ
         Voltage = U⁺-U⁻-η
         du[8] = input_value-(Iapp*Voltage)
     elseif input_type==2
+        U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+        U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
+    
+    
+        J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
+        J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
+    
+        η₊ = butler_volmer(J₀⁺,J⁺,Temp)
+        η₋ = butler_volmer(J₀⁻,J⁻,Temp)
+    
+        ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+        ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
+    
+        ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
+        ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+
+        ηₛ = sei_ohmic(ω, Iapp)
+
+        η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊+ηₛ
         Voltage = U⁺-U⁻-η
         du[8] = input_value-Voltage 
     elseif input_type==3
@@ -257,11 +269,30 @@ function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,catho
     elseif input_type==4
         du[8] = Iapp-0
     elseif input_type==5
-        Voltage = U⁺-U⁻-η
         if p.cccv_switch == true
             if p.cccv_switch_2 == true
                 du[8] = Iapp - 0
             else
+                U⁺ = cathodeocv((cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
+                U⁻ = anodeocv((cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min),Temp)
+            
+            
+                J₀⁻ = exchange_current_density(cₛˢ⁻,cₑ⁻,anodeocv.c_s_max,p.k₀⁻)
+                J₀⁺ = exchange_current_density(cₛˢ⁺,cₑ⁺,cathodeocv.c_s_max,p.k₀⁺)
+            
+                η₊ = butler_volmer(J₀⁺,J⁺,Temp)
+                η₋ = butler_volmer(J₀⁻,J⁻,Temp)
+            
+                ηc₋ = concentration_overpotential(cₑ⁻,cₑˢ,t⁺,Temp,T⁻)
+                ηc₊ = concentration_overpotential(cₑˢ,cₑ⁺,t⁺,Temp,T⁺)
+            
+                ηₒ₋ = electrolyte_ohmic(εₑ⁻,β⁻,κ,Iapp,T⁻)
+                ηₒ₊ = electrolyte_ohmic(εₑ⁺,β⁺,κ,Iapp,T⁺)
+        
+                ηₛ = sei_ohmic(ω, Iapp)
+        
+                η = η₊+η₋+ηc₋+ηc₊+ηₒ₋+ηₒ₊+ηₛ
+                Voltage = U⁺-U⁻-η
                 du[8] = Voltage - p.vfull
             end
         else
