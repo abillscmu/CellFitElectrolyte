@@ -183,13 +183,24 @@ function butler_volmer(J₀,J,T)
     return @fastmath (R.*T./(0.5.*F)).*asinh.(J./(2J₀))
 end
 
-function concentration_overpotential(cₑ⁺,cₑ⁻,t⁺,Temp,Δx)
+function concentration_overpotential(cₑ⁺::Array,cₑ⁻::Array,t⁺,Temp,Δx)
     @fastmath ΔΦ = 2 .*(1 .-t⁺).*R.*Temp.*log.(cₑ⁺./cₑ⁻)./(F)
     return ΔΦ
 end
 
+function concentration_overpotential(cₑ⁺,cₑ⁻,t⁺,Temp,Δx)
+    @fastmath ΔΦ = 2 *(1 -t⁺)*R*Temp*log(cₑ⁺/cₑ⁻)/(F)
+    return ΔΦ
+end
+
+function electrolyte_ohmic(ε,β,κ,Iapp::Array,Δx)
+    @fastmath η = Δx.*Iapp./(ε.^β.*κ)
+    return η
+end
+
 function electrolyte_ohmic(ε,β,κ,Iapp,Δx)
-    return Δx.*Iapp./(ε.^β.*κ)
+    @fastmath η = Δx*Iapp/(ε^β*κ)
+    return η
 end
 
 function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp::Array,Temp::Array)

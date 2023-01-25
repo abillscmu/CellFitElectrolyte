@@ -1,42 +1,44 @@
-using CellFitElectrolyte
-using CellFitElectrolyte.ComponentArrays
-using CellFitElectrolyte.OrdinaryDiffEq
-using CellFitElectrolyte.OCV
-using CellFitElectrolyte.Parameters
-using CellFitElectrolyte.DataInterpolations
-using CellFitElectrolyte.DiffEqFlux
-using CellFitElectrolyte.Turing
-using StaticArrays
-using CSV
-using DataFrames
-using Test
-using ProgressMeter
-using LinearAlgebra
-using Statistics
-using JLD2
-using KernelDensity
-using KDEDistributions
-using PythonPlot
+@everywhere using Pkg
+@everywhere Pkg.activate(".")
+@everywhere using CellFitElectrolyte
+@everywhere using CellFitElectrolyte.ComponentArrays
+@everywhere using CellFitElectrolyte.OrdinaryDiffEq
+@everywhere using CellFitElectrolyte.OCV
+@everywhere using CellFitElectrolyte.Parameters
+@everywhere using CellFitElectrolyte.DataInterpolations
+@everywhere using CellFitElectrolyte.DiffEqFlux
+@everywhere using CellFitElectrolyte.Turing
+@everywhere using StaticArrays
+@everywhere using CSV
+@everywhere using DataFrames
+@everywhere using Test
+@everywhere using ProgressMeter
+@everywhere using LinearAlgebra
+@everywhere using Statistics
+@everywhere using JLD2
+@everywhere using KernelDensity
+@everywhere using KDEDistributions
+@everywhere using PythonPlot
 
 #set up simulation
-cache = CellFitElectrolyte.initialize_cache(Float64)
-cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
+@everywhere cache = CellFitElectrolyte.initialize_cache(Float64)
+@everywhere cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
-initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
+@everywhere initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
 vfull = initialcond["Starting Voltage[V]"]
-cellgeometry = CellFitElectrolyte.cell_geometry()
+@everywhere cellgeometry = CellFitElectrolyte.cell_geometry()
 
 p_phys = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0,εₑ⁻ = 0, εₑ⁺ = 0, frac_sol_am_pos=0, frac_sol_am_neg=0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
 
-cells = ["VAH01","VAH05","VAH06","VAH09","VAH10","VAH11","VAH12","VAH13","VAH15","VAH16","VAH17"]
+@everywhere cells = ["VAH01","VAH05","VAH06","VAH09","VAH10","VAH11","VAH12","VAH13","VAH15","VAH16","VAH17"]
 
 #Load data
-FOLDERNAME = "results/outputs0117_elec/"
+@everywhere FOLDERNAME = "results/outputs0117_elec/"
 
 #Build Distributions
-data_dict = Dict()
-predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
-for file in readdir(FOLDERNAME)
+@everywhere data_dict = Dict()
+@everywhere predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
+@everywhere for file in readdir(FOLDERNAME)
         vah = split(file, "_")[1]
         if !(vah in cells)
             continue
@@ -84,12 +86,12 @@ for file in readdir(FOLDERNAME)
 end
 
 #Load CycleArrays
-cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"]
+@everywhere cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"]
 
 #u[13] => δ⁻
 #u[14] => δ⁺
 
-function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, cycles_to_save, eps_0, f_0) where {T}
+@everywhere function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, cycles_to_save, eps_0, f_0) where {T}
     # Handle Initial Conditions
     u::Array{T,1}  = zeros(T, 10)
     CellFitElectrolyte.initial_conditions!(u,p.p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
@@ -312,42 +314,54 @@ end
 return integrator.sol
 end
 
+@everywhere function degradation_simulator(cell, p_deg)
+    err = 0
+    cell_integer = parse(Int, split(cell, "VAH")[2])
+    cycle_array = cycle_array_vec[cell_integer][2:end]
+
+    ω = mean(data_dict[cell]["distributions"][2][:ω].data)
+    εₑ⁻ = mean(data_dict[cell]["distributions"][2][:εₑ⁻].data)
+    εₑ⁺ = mean(data_dict[cell]["distributions"][2][:εₑ⁺].data)
+    frac_sol_am_neg = mean(data_dict[cell]["distributions"][2][:frac_sol_am_neg].data)
+    frac_sol_am_pos = mean(data_dict[cell]["distributions"][2][:frac_sol_am_pos].data)
+    
+    εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
+    εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
+    εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
+    εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
+
+    eps_0 = εᵧ⁻
+    f_0 = frac_sol_am_neg
+
+    if cell == "VAH07"
+        vfull = 4.0
+    elseif cell == "VAH23"
+        vfull = 4.1
+    else
+        vfull = 4.2
+    end
+
+    p_phys = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0,εₑ⁻ = 0, εₑ⁺ = 0, frac_sol_am_pos=0, frac_sol_am_neg=0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
+
+    ics = ComponentVector(ω=ω, εₑ⁻=εₑ⁻, εₑ⁺=εₑ⁺, frac_sol_am_neg=frac_sol_am_neg, frac_sol_am_pos=frac_sol_am_pos)
+    p = ComponentVector(p_deg=p_deg, p_phys = p_phys, ics=ics)
+
+    u_out = lifetime_evaluator(p, cycle_array, data_dict[cell]["cycles"], eps_0, f_0)
+    sorted_cycles = sort(data_dict[cell]["cycles"])
+    for (i, cycle) in enumerate(sorted_cycles)
+        #fit based on volume fraction
+        err += (data_dict[cell]["mean"][cycle][:εᵧ⁻] - u_out[10, i]).^2
+    end
+    return err
+end
+
 function fit_cfe_degradation(cycle_array_vec, data_dict, cells, p_deg)
     #(this would be rand for SG)
-    err = 0.0
     num = 0
-    for cell in cells
-        cell_integer = parse(Int, split(cell, "VAH")[2])
-        cycle_array = cycle_array_vec[cell_integer][2:end]
-
-        ω = mean(data_dict[cell]["distributions"][2][:ω].data)
-        εₑ⁻ = mean(data_dict[cell]["distributions"][2][:εₑ⁻].data)
-        εₑ⁺ = mean(data_dict[cell]["distributions"][2][:εₑ⁺].data)
-        frac_sol_am_neg = mean(data_dict[cell]["distributions"][2][:frac_sol_am_neg].data)
-        frac_sol_am_pos = mean(data_dict[cell]["distributions"][2][:frac_sol_am_pos].data)
-    
-        εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
-        εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
-        εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
-        εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
-
-        eps_0 = εᵧ⁻
-        f_0 = frac_sol_am_neg
-
-        p_phys = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0,εₑ⁻ = 0, εₑ⁺ = 0, frac_sol_am_pos=0, frac_sol_am_neg=0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
-
-        ics = ComponentVector(ω=ω, εₑ⁻=εₑ⁻, εₑ⁺=εₑ⁺, frac_sol_am_neg=frac_sol_am_neg, frac_sol_am_pos=frac_sol_am_pos)
-        p = ComponentVector(p_deg=p_deg, p_phys = p_phys, ics=ics)
-
-        u_out = lifetime_evaluator(p, cycle_array, data_dict[cell]["cycles"], eps_0, f_0)
-        sorted_cycles = sort(data_dict[cell]["cycles"])
-        for (i, cycle) in enumerate(sorted_cycles)
-            #fit based on volume fraction
-            err += (data_dict[cell]["mean"][cycle][:εᵧ⁻] - u_out[10, i]).^2
-            num += 1
-        end
-    end
-    return sqrt(err/num)
+    errs = pmap((cell) -> degradation_simulator(cell, p_deg), cells)
+    num = sum(length(data_dict[cell]["cycles"]) for cell in cells)
+    #return 0
+    return sqrt(sum(errs)/num)
 end
 
 
@@ -404,3 +418,5 @@ lb = ComponentArray(
 )
 
 sol = CellFitElectrolyte.anneal(loss, p_deg, ub, lb)
+
+@save "SEI_nothermals_sol.jld2" sol

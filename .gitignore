@@ -13,4 +13,4 @@ outputs/
 .CondaPkg/
 figs/
 *.jld2
-*.pb.gz
+profile.pb.gz

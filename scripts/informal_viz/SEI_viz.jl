@@ -97,8 +97,8 @@ function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, cycles_to_sa
     @unpack R⁻ = p.p_phys
     d_0 = R⁻*(f_0 + 0.03)^(-1/3) - R⁻
 
-    u[9] = eps_0
-    u[10] = d_0
+    u[9] = d_0
+    u[10] = eps_0
 
     cycle_array = cycle_array_vec[1]
     num_steps = Int(cycle_array[1])
@@ -351,7 +351,9 @@ function fit_cfe_degradation(cycle_array_vec, data_dict, cells, p_deg)
     return sqrt(err/num)
 end
 
-model(p_deg) = fit_cfe_degradation(cycle_array_vec, data_dict, p_deg)
+cycles_to_save = 
+
+model(p_deg) = fit_cfe_degradation(cycle_array_vec, data_dict, cells, p_deg)
 
 
 k_sei_neg = 1e-15
