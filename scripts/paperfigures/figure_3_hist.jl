@@ -2,7 +2,7 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs0112_elec/"
+FOLDERNAME = "results/outputs0117_elec/"
 CELL = "VAH01"
 SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :c_e_0]
 minmax = Dict(sym => Dict("min" => Inf, "max" => -Inf) for sym in SYMBOLS)

@@ -1,8 +1,8 @@
 using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
-pygui(true)
+#pygui(true)
 
-FOLDERNAME = "results/outputs0114_elec/"
+FOLDERNAME = "results/outputs0117elec/"
 CELLS = ["VAH01"]
 SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg]
 
