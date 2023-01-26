@@ -28,7 +28,7 @@ VAH = "VAH01_20"
 #cycle = parse(Int,split1[3])
 
 
-df = CSV.read("/home/abills/Data/$(VAH).csv",DataFrame)
+df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 idx = findfirst(isequal(0),df.Ns)
 df = df[1:idx,:]
@@ -148,7 +148,7 @@ end
 model = fit_cfe(interpolated_voltage)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, DynamicNUTS(), 1000)
+chain = sample(model, DynamicNUTS(), 1000, 3)
 
 #=
 εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])

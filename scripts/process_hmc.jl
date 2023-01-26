@@ -2,7 +2,7 @@ using Turing, DynamicHMC, PythonPlot, JLD2, KernelDensity, DataFrames, PythonCal
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs1212_vah02_hmc/"
+FOLDERNAME = "results/outputs1214_nuts_vah01/"
 
 figure(1)
 clf()
@@ -15,8 +15,12 @@ mle_vec = []
 
 sym = :ω
 
-for file in readdir(FOLDERNAME)
+cell = for file in readdir(FOLDERNAME)
     filename = FOLDERNAME * file
+    arr = parse(Int, split(split(file, "VAH")[2],"_")[1])
+    if arr == 2
+        continue
+    end
     cell = parse(Int,split(file,"_")[2])
     chain = try
         d = load(filename)
@@ -43,11 +47,11 @@ df = DataFrame(cells=cells, lower_bound=n_li_lower_bound, upper_bound=n_li_upper
 sorted_df = sort(df, :cells)
 
 figure(1);
-clf()
-fill_between(np.array(pyfloat.(sorted_df.cells),dtype=np.float),np.array(pyfloat.(sorted_df.lower_bound),dtype=np.float),np.array(pyfloat.(sorted_df.upper_bound),dtype=np.float), facecolor="grey")
+#clf()
+fill_between(np.array(pyfloat.(sorted_df.cells),dtype=np.float),np.array(pyfloat.(sorted_df.lower_bound),dtype=np.float),np.array(pyfloat.(sorted_df.upper_bound),dtype=np.float), facecolor="grey", alpha = 1)
 plot(sorted_df.cells, sorted_df.mid,"b")
-plot(sorted_df.cells, sorted_df.mle, "g")
-legend(["95%","50% Quantile", "MAP"])
+#plot(sorted_df.cells, sorted_df.mle, "g")
+legend(["95%","Median"])
 xlabel("Cycle")
 ylabel(string(sym))
 PythonPlot.matplotlib.rcParams["font.size"] = 12
