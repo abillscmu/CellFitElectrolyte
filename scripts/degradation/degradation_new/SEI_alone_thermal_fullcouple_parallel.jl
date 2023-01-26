@@ -238,9 +238,9 @@ for (i, cycle_array) in enumerate(cycle_array_vec)
         OrdinaryDiffEq.set_u!(integrator, u)
         while Voltage >= 2.5
             step!(integrator)
-            #if integrator.sol.retcode != :Default
-            #    return zeros(length(integrator.u))
-            #end
+            if integrator.sol.retcode != :Default
+                return zeros(length(integrator.u))
+            end
             Voltage = CellFitElectrolyte.calc_voltage(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
         end
         input_type = 0.0
@@ -250,9 +250,9 @@ for (i, cycle_array) in enumerate(cycle_array_vec)
         add_tstop!(integrator, end_time)
         while integrator.t < end_time
             step!(integrator)
-            #if integrator.sol.retcode != :Default
-            #    return zeros(length(integrator.u))
-            #end
+            if integrator.sol.retcode != :Default
+                return zeros(length(integrator.u))
+            end
             Voltage = CellFitElectrolyte.calc_voltage(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
         end
         input_type = 5.0
@@ -265,9 +265,9 @@ for (i, cycle_array) in enumerate(cycle_array_vec)
         while integrator.u[8] < -0.01
             step!(integrator)
             Voltage = CellFitElectrolyte.calc_voltage(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
-            #if integrator.sol.retcode != :Default
-            #    return zeros(length(integrator.u))
-            #end
+            if integrator.sol.retcode != :Default
+                return zeros(length(integrator.u))
+            end
             if ((Voltage >= integrator.p.p_phys.vfull) & ((integrator.p.p_phys.cccv_switch != true)))
                 integrator.p.p_phys.cccv_switch = true
             end
@@ -326,6 +326,9 @@ for (i, cycle_array) in enumerate(cycle_array_vec)
                             integrator.opts.dtmax = 10
                         end
                             step!(integrator)
+                            if integrator.sol.retcode !=:Default
+                                return zeros(length(integrator.u))
+                            end
                             Voltage = CellFitElectrolyte.calc_voltage(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
                         if ((Voltage >= p.p_phys.vfull) & ((integrator.p.p_phys.cccv_switch != true)))
                             integrator.p.p_phys.cccv_switch = true
@@ -342,11 +345,11 @@ for (i, cycle_array) in enumerate(cycle_array_vec)
                     integrator.opts.dtmax = end_time - integrator.t
                     while integrator.t < end_time
                         step!(integrator)
+                        if integrator.sol.retcode != :Default
+                            return zeros(length(integrator.u), length(cycles_to_save))
+                        end
                     end
                 end
-                #if integrator.sol.retcode != :Default
-                #    return zeros(length(integrator.u), length(cycles_to_save))
-                #end
             
         end
     end
@@ -464,3 +467,5 @@ lb = ComponentArray(
 )
 
 sol = CellFitElectrolyte.anneal(loss, p_deg, ub, lb)
+
+@save "sei_fullycoupled.jld2" sol

@@ -14,3 +14,4 @@ outputs/
 figs/
 *.jld2
 profile.pb.gz
+logs/
