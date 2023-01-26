@@ -22,13 +22,15 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_20"
+cyc = ENV["SLURM_ARRAY_TASK_ID"]
+
+VAH = "VAH01_$(cyc)"
 #split1 = split(VAH,['H','_'])
 #cell = parse(Int,split1[2])
 #cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("~/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 idx = findfirst(isequal(0),df.Ns)
 df = df[1:idx,:]
@@ -150,6 +152,11 @@ model = fit_cfe(interpolated_voltage)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
 chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 3; progress=true)
+d = Dict("chain" => chain)
+
+
+save("results_1215_stoichs/$VAH.jld2", d)
+sleep(5)
 
 #=
 εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
