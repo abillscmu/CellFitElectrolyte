@@ -1,60 +1,61 @@
-@everywhere using Pkg
-@everywhere Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 
-@everywhere using CellFitElectrolyte
-@everywhere using CellFitElectrolyte.ComponentArrays
-@everywhere using CellFitElectrolyte.OrdinaryDiffEq
-@everywhere using CellFitElectrolyte.OCV
-@everywhere using CellFitElectrolyte.Parameters
-@everywhere using CellFitElectrolyte.DataInterpolations
-@everywhere using CellFitElectrolyte.DiffEqFlux
-@everywhere using CellFitElectrolyte.Turing
-@everywhere using StaticArrays
-@everywhere using CSV
-@everywhere using DataFrames
-@everywhere using Test
-@everywhere using ProgressMeter
-@everywhere using LinearAlgebra
-@everywhere using Statistics
-@everywhere using JLD2
-@everywhere using KernelDensity
-@everywhere using KDEDistributions
-@everywhere using PythonPlot
+using CellFitElectrolyte
+using CellFitElectrolyte.ComponentArrays
+using CellFitElectrolyte.OrdinaryDiffEq
+using CellFitElectrolyte.OCV
+using CellFitElectrolyte.Parameters
+using CellFitElectrolyte.DataInterpolations
+using CellFitElectrolyte.DiffEqFlux
+using CellFitElectrolyte.Turing
+using StaticArrays
+using CSV
+using DataFrames
+using Test
+using ProgressMeter
+using LinearAlgebra
+using Statistics
+using JLD2
+using KernelDensity
+using KDEDistributions
+using PythonPlot
 
 #set up neural network (inputs)
-@everywhere num_layers = 2
-@everywhere activation = tanh
-@everywhere width = 10
-@everywhere num_augmented_states = 0
-@everywhere divisor = 11
-@everywhere lambda = 1e-11
+num_layers = 2
+activation = tanh
+width = 10
+num_augmented_states = 0
+divisor = 14
+lambda = 1e-10
 #legacy
-@everywhere predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
-@everywhere cells = ["VAH01","VAH05","VAH06","VAH09","VAH10","VAH11","VAH12","VAH13","VAH15","VAH16","VAH17"]
+predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
+cell = "VAH"*lpad(parse(Int, ENV["SLURM_ARRAY_TASK_ID"]),2,"0")
+cells = [cell,]
 
 
 #set up neural network (derived)
-@everywhere num_predicted_states = length(predicted_states)
-@everywhere input_dim = 9 + num_predicted_states + num_augmented_states
-@everywhere output_dim = num_predicted_states + num_augmented_states
-@everywhere nn = CellFitElectrolyte.build_nn(num_layers, activation, width, input_dim, output_dim)
+num_predicted_states = length(predicted_states)
+input_dim = 9 + num_predicted_states + num_augmented_states
+output_dim = num_predicted_states + num_augmented_states
+nn = CellFitElectrolyte.build_nn(num_layers, activation, width, input_dim, output_dim)
 
 #set up simulation
-@everywhere cache = CellFitElectrolyte.initialize_cache(Float64)
-@everywhere cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
+cache = CellFitElectrolyte.initialize_cache(Float64)
+cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
-@everywhere initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
+initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
 vfull = initialcond["Starting Voltage[V]"]
-@everywhere cellgeometry = CellFitElectrolyte.cell_geometry()
+cellgeometry = CellFitElectrolyte.cell_geometry()
 
 p_phys = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = 0.6, εₛ⁺ = 0.75, εᵧ⁺ = 0, εᵧ⁻ = 0,εₑ⁻ = 0, εₑ⁺ = 0, frac_sol_am_pos=0, frac_sol_am_neg=0, c = 50.0, h = Inf, Tamb = 320.0, Temp = 320.0, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = 0.01, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
 
 #Load data
-@everywhere FOLDERNAME = "results/outputs0117_elec/"
+FOLDERNAME = "results/outputs0117_elec/"
 
 #Build Distributions
-@everywhere data_dict = Dict()
-@everywhere for file in readdir(FOLDERNAME)
+data_dict = Dict()
+for file in readdir(FOLDERNAME)
     vah = split(file, "_")[1]
     if !(vah in cells)
         continue
@@ -93,12 +94,12 @@ p_phys = ComponentVector{Any}(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068
 end
 
 #Load CycleArrays
-@everywhere cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"]
+cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"]
 
 #u[13] => δ⁻
 #u[14] => δ⁺
 
-@everywhere function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, cycles_to_save) where {T}
+function lifetime_evaluator(p::ComponentVector{T}, cycle_array_vec, cycles_to_save) where {T}
     # Handle Initial Conditions
     u::Array{T,1}  = Array{T, 1}(undef, input_dim)
     CellFitElectrolyte.initial_conditions!(u,p.p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
@@ -368,7 +369,7 @@ end
     return integrator.sol
 end
 
-@everywhere function degradation_simulator(cell, p_deg)
+function degradation_simulator(cell, p_deg)
     err = 0
     cell_integer = parse(Int, split(cell, "VAH")[2])
     cycle_array = cycle_array_vec[cell_integer][2:end]
@@ -411,10 +412,9 @@ end
 function fit_cfe_degradation(cycle_array_vec, data_dict, cells, p_deg)
     #(this would be rand for SG)
     num = 0
-    errs = pmap((cell) -> degradation_simulator(cell, p_deg), cells)
-    num = sum(length(data_dict[cell]["cycles"]) for cell in cells)
-    #return 0
-    return sqrt(sum(errs)/num)
+    err = degradation_simulator(cell, p_deg)
+    num = length(data_dict[cell]["cycles"])
+    return sqrt(err/num)
 end
 
 
@@ -428,12 +428,12 @@ function loss(p_deg)
 end
 
 
-p_deg = Float64.(initial_params(nn))./(1*10^divisor)
+p_deg = initial_params(nn)./(1*10^divisor)
 
-#loss(p_deg)
+loss(p_deg)
 
 sol = CellFitElectrolyte.anneal(loss, p_deg, lambda)
 
 
 
-@save "NN_thermals_sol.jld2" sol
+@save "NN_nothermals_sol_split.jld2" sol

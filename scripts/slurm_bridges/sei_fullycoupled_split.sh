@@ -9,4 +9,4 @@
 #SBATCH -o logs/sei_split%a.out
 #SBATCH -e logs/sei_split%a.err
 
-julia --project=. scripts/degradation/degradation_new/SEI_alone_thermal_fullcouple_split.jl
+stdbuf -i0 -o0 -e0 julia --project=. scripts/degradation/degradation_new/SEI_alone_thermal_fullcouple_split.jl
