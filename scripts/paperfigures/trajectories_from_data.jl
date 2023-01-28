@@ -13,6 +13,7 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using PythonPlot
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
@@ -32,11 +33,11 @@ for (i,c) in enumerate(CELLS)
     for (j, cycle) in enumerate(CYCLES[i])
     VAH = c*"_$cycle"
     split1 = split(VAH,['H','_'])
-    cell = parse(Int,split1[2])
+    cell = parse(Int,split1[2]) 
     cycle = parse(Int,split1[3])
 
 
-df = CSV.read("/Users/abills/Datasets/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/home/abills/Data/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 filter!(row->row.Ns>=4,df)
 

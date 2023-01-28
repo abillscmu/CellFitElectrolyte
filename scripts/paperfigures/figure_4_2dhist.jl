@@ -1,6 +1,7 @@
 using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
-pygui(true)
+#pygui(true)
+
 
 FOLDERNAME = "results/outputs0117_elec/"
 CELLS = ["VAH06","VAH07","VAH09"]

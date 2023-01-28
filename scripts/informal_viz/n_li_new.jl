@@ -1,6 +1,6 @@
 using Turing, DynamicHMC, PythonPlot, JLD2, KernelDensity, DataFrames, PythonCall, CellFitElectrolyte, CellFitElectrolyte.OCV
 np = pyimport("numpy")
-pygui(true)
+#pygui(true)
 
 FOLDERNAME = "results/outputs0117_elec/"
 
