@@ -451,4 +451,4 @@ lb = ComponentArray(
 
 sol = CellFitElectrolyte.anneal(loss, p_deg, ub, lb)
 
-#@save "sei_$(cell)_fullycoupled.jld2" sol
+@save "dissolution_$(cell)_fullycoupled.jld2" sol
