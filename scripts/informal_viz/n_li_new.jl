@@ -2,7 +2,7 @@ using Turing, DynamicHMC, PythonPlot, JLD2, KernelDensity, DataFrames, PythonCal
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs0114_elec/"
+FOLDERNAME = "results/outputs0117_elec/"
 
 figure(1)
 clf()
@@ -12,9 +12,10 @@ n_li_lower_bound = []
 n_li_upper_bound = []
 n_li_50 = []
 mle_vec = []
-
+cellgeometry = CellFitElectrolyte.cell_geometry()
+cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 sym = :n_li
-vah = "VAH01"
+vah = "VAH10"
 cell = for file in readdir(FOLDERNAME)
     if !occursin(vah, file)
         continue

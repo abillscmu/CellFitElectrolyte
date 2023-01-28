@@ -132,7 +132,7 @@ end
 
 thing = []
 
-chain = load("results/outputs0112_elec/$(VAH)_HMC.jld2")["chain"]
+chain = load("results/outputs0114_elec/$(VAH)_HMC.jld2")["chain"]
 params = DataFrame(chain)
 for n in 1:size(params)[1]
     frac_sol_am_neg = params.frac_sol_am_neg[n]
@@ -140,7 +140,7 @@ for n in 1:size(params)[1]
     εₑ⁺ = params.εₑ⁺[n]
     εₑ⁻ = params.εₑ⁻[n]
     x⁻₀ = 0.6
-    ω = 0.0
+    ω = params.ω[n]
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
