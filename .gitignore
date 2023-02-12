@@ -1,3 +1,4 @@
+*.xlsx
 results/
 Manifest.toml
 .vscode
@@ -10,6 +11,7 @@ reports/detailedreportVAH*
 outputs/
 *.eps
 *.pdf
+*.png
 .CondaPkg/
 figs/
 *.jld2

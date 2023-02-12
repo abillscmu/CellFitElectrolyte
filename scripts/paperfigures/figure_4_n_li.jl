@@ -4,8 +4,8 @@ np = pyimport("numpy")
 
 
 FOLDERNAME = "results/outputs0117_elec/"
-CELLS = ["VAH11"]
-SYMBOLS = [:n_li]
+CELLS = ["VAH01"]
+SYMBOLS = Array([k for k in keys(data_dict["VAH11"]["distributions"][2])])
 
 
 
@@ -23,8 +23,8 @@ for (i,CELL) in enumerate(CELLS)
         cell_to_load = "$(FOLDERNAME)$(CELL)_$(cell)_HMC.jld2"
         chain = try
             d = load(cell_to_load)
-            chain = d["chain"]
-            append!(val, chain[SYMBOL].data[:,1])
+            data = data_dict[CELL]["distributions"][cell][SYMBOL].data
+            append!(val, data)
             append!(cyc, cell*ones(1000))
         catch
             @warn "problem with $cell"

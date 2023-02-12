@@ -1,0 +1,10 @@
+﻿Name,εₑ⁻,εₑ⁺,ω,n_li,εₛ⁺,εₛ⁻
+SEI Growth (-),-1,0,1,-1,0,0
+SEI Growth (+),0,-1,1,-1,0,0
+Plating,-1,0,0,-1,0,0
+Pore Clogging (-),-1,0,0,-1,0,-1
+Pore Clogging (+),0,-1,0,-1,-1,0
+Surface Cracking,-1,0,1,-1,0,0
+Stress-based LAM,0,0,0,-1,-1,0
+Dissolution,0,1,0,-1,-1,0
+Electrolyte Oxidation (+),0,1,0,0,-1,-1
