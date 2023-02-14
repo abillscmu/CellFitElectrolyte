@@ -265,7 +265,7 @@ function calc_voltage(sol,p,t::Array,cache,cellgeometry,cathodeocv,anodeocv,Iapp
 end
 
 
-function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},cellgeometry::ComponentVector{T},cathodeocv::RKPolynomial{Vector{T},T},anodeocv::RKPolynomial{Vector{T},T},Iapp) where {T}
+function calc_voltage(u::Array{T,1},p::ComponentVector{T},t::T,cache::cache{T},cellgeometry::ComponentVector{T},cathodeocv::OCV.OpenCircuitVoltage,anodeocv::OCV.OpenCircuitVoltage,Iapp) where {T}
 
     cₛˢ⁻::T = u[1]
     cₛᵇ⁻::T = u[2]
