@@ -1,23 +1,34 @@
 using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall, KDEDistributions
 np = pyimport("numpy")
-pygui(true)
+#pygui(true)
 
-FOLDERNAME = "results/outputs0106_fullcyc/"
-CELL = "VAH01"
+FOLDERNAME = "results/outputs0117_elec/"
+files = readdir(FOLDERNAME)
+cells = similar(files)
+for (i,f) in enumerate(files)
+    cells[i] = split(f, "_")[1]
+end
+cells = unique(cells)
+files = 1
 SYMBOL = :frac_sol_am_pos
 SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
+SYMBOL_LABELS = ["ω [Ω]","εₑ⁻","εₑ⁺","fₛ⁻","fₛ⁺"]
 
-cyc = []
 
+#cells = ["VAH01"]
+for CELL in cells
+    fig, ax = subplots(length(SYMBOLS),1,figsize=(12.5,8))
 thing = Dict()
 
 
-
+cyc = []
 for sym in SYMBOLS
 minval = []
 maxval = []
 
 val = []
+
+
 for cell in 0:2500
     cell_to_load = "$(FOLDERNAME)$(CELL)_$(cell)_HMC.jld2"
     chain = try
@@ -29,7 +40,9 @@ for cell in 0:2500
         append!(val, fisher)
         append!(minval, minimum(data))
         append!(maxval, maximum(data))
-        append!(cyc, cell)
+        if sym == :ω
+            append!(cyc, cell)
+        end
     catch
         @warn "problem with $cell"
         continue
@@ -46,21 +59,21 @@ num_rows = length(SYMBOLS)
 num_cols = length(thing[:ω]["val"])
 
 arr = zeros(num_rows, num_cols)
+cmap = PythonPlot.get_cmap("Blues_r")
 
 for (i,sym) in enumerate(SYMBOLS)
-    println(sym)
-    totalmin = minimum(thing[sym]["min"])
-    totalmax = maximum(thing[sym]["max"])
-    totalrange = totalmax-totalmin
-    normalizedvar = thing[sym]["val"] ./ totalrange
-    arr[i,:] .= normalizedvar
-end
 
-figure(1)
-clf()
-pcolor(arr)
-xlabel("Cycle")
-colorbar()
-yticks(0.5:4.5, SYMBOLS)
+    indices = sortperm(cyc)
+    cyc_sorted = cyc[indices]
+    val_sorted = thing[sym]["val"][indices]
+    
+    cell_num = parse(Int,CELL[end-1:end])/35
+    ax[i-1].plot(cyc_sorted,val_sorted)
+    ax[i-1].set_ylabel("σ($(SYMBOL_LABELS[i]))")
+end
+ax[-1].set_xlabel("Cycle Number")
+fig.savefig("figs/si/variances/$CELL.png",bbox_inches="tight")
+fig.savefig("figs/si/variances/$CELL.pdf",bbox_inches="tight")
+end
 
 

@@ -2,9 +2,11 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 #pygui(true)
 
+PythonPlot.matplotlib.rcParams["font.size"] = 10
+
 
 FOLDERNAME = "results/outputs0117_elec/"
-CELLS = ["VAH01","VAH02","VAH05","VAH06", "VAH12", "VAH30"]
+CELLS = ["VAH07","VAH09","VAH10","VAH11","VAH13","VAH15","VAH16","VAH17","VAH20","VAH22","VAH23","VAH24","VAH25","VAH26","VAH27","VAH28"]
 SYMBOLS = SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
 num_rows = length(SYMBOLS)
 num_cols = length(CELLS)
@@ -33,9 +35,6 @@ ylabels = Dict(
 
 fig, axes = subplots(nrows=num_rows, ncols=num_cols, figsize=(8.5,8.5))
 fig.subplots_adjust(hspace=0.05, wspace=0.05)
-PythonPlot.matplotlib.rcParams["font.size"] = 16
-
-PythonPlot.matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
   
 for (j,CELL) in enumerate(CELLS)
@@ -70,6 +69,7 @@ for (j,CELL) in enumerate(CELLS)
         bot_mark = round(0.25*x_range + min_x)
         axes[i-1,j-1].set_xlim(xlimit_thiscell)
         axes[i-1,j-1].set_xticks(pylist([bot_mark, top_mark]))
+        axes[i-1,j-1].set_xticklabels(pylist([bot_mark, top_mark]),rotation=45, ha="right",rotation_mode="anchor")
     else
         max_x = pyconvert(Int64,xlimit_thiscell[1])
         min_x = pyconvert(Int64,xlimit_thiscell[0])
@@ -85,7 +85,7 @@ for (j,CELL) in enumerate(CELLS)
         axes[i-1,j-1].set_xlim(axes[i-2,j-1].get_xlim())
     end
     if i == 1
-        axes[i-1,j-1].set_title(CELL)
+        axes[i-1,j-1].set_title(CELL,rotation=-45,rotation_mode="anchor",ha="right")
     end
     if j == 1
         axes[i-1,j-1].set_ylabel(yname)
@@ -112,5 +112,5 @@ for (j,CELL) in enumerate(CELLS)
 end
 end 
 #tight_layout()
-savefig("figs/2dhist_final.png", bbox_inches="tight")
-savefig("figs/2dhist_final.pdf", bbox_inches="tight")
+savefig("figs/si/2dhist_final.png", bbox_inches="tight")
+savefig("figs/si/2dhist_final.pdf", bbox_inches="tight")

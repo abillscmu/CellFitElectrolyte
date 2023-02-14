@@ -8,8 +8,17 @@ mycolors = ["blue","orange","green"]
 
 nrow = length(ys)
 ncol = length(xs)
-CELL = "VAH11"
-cycles = [2,1100, 2200]
+CELL = "VAH30"
+
+low = minimum(data_dict[CELL]["cycles"])
+mid = median(data_dict[CELL]["cycles"])
+if mid%1 != 0
+    mid = floor(mid)
+end
+high = maximum(data_dict[CELL]["cycles"])
+
+cycles = [low, mid, high]
+
 
 x_type = "absolute"
 y_type = "delta_N"

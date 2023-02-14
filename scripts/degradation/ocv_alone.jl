@@ -8,7 +8,7 @@ capacity_dict = Dict()
 
 
 
-@showprogress for file in readdir("results/outputs0117_elec/")
+for file in ["VAH01_840_HMC.jld2"]
     println(file)
     cell = split(file,"_")[1]
     cycle = parse(Int,split(file,"_")[2])
@@ -56,7 +56,7 @@ capacity_dict = Dict()
         x⁻ = (n_li_n_end/Vₛ⁻)/anodeocv.c_s_max
         try
             V = calcocv(cathodeocv, x⁺, 297.0) - calcocv(anodeocv, x⁻, 297.0)
-            return [V]
+            return [V - 3.0]
         catch
             return [1e12]
         end

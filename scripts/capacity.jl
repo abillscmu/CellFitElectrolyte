@@ -4,10 +4,13 @@ FOLDERNAME = "/Users/abills/Datasets/cycle_individual_data/"
 markers = ["o","v","^","<",">","1","2","3","4","s","p","P","*","h","H","+","x","X","D","d","|","_"]
 cell = "VAH01"
 cap_data_dict = Dict()
-fig,axes = subplots()
+
 cells = [cell for cell in keys(ex_data_dict["cells"])]
-cells = ["VAH01"]
 for (i,cell) in enumerate(cells)
+    fig,ax = subplots()
+    d = load("results/capacities/$(cell)_relaxation.jld2")
+    caps = d[cell]
+
     println(cell)
 
 cmap = PythonPlot.get_cmap("Blues_r")
@@ -37,11 +40,21 @@ for file in readdir(FOLDERNAME)
     append!(cap_data_dict[cell]["cycle"],cycle)
 
 end
-axes.scatter(cap_data_dict[cell]["cycle"],cap_data_dict[cell]["capacity"],marker=markers[i])
-axes.set_xlabel("Cycle")
-axes.set_ylabel("Capacity [Ah]")
+
+
+cycles = sort([c for c in keys(caps)])
+cap_min = [minimum(caps[cyc]) for cyc in cycles].*26.8
+cap_max = [maximum(caps[cyc]) for cyc in cycles].*26.8
+
+ax.fill_between(cycles, cap_min, cap_max,label="estimated theoretical capacity",color="grey")
+ax.scatter(cap_data_dict[cell]["cycle"],cap_data_dict[cell]["capacity"],label="RPT capacity")
+ax.set_xlabel("Cycle")
+ax.set_ylabel("Capacity [Ah]")
+ax.legend()
+fig.savefig("figs/si/capacities/$(cell).pdf")
+
 end
-axes.legend(cells,loc="center left",ncols=2,bbox_to_anchor=(1.02, 0.5))
+
 
 #fig.savefig("figs/capacity_plot.pdf",bbox_inches="tight")
 #fig.savefig("figs/capacity_plot.png",bbox_inches="tight")

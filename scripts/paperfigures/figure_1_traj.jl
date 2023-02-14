@@ -14,15 +14,60 @@ using LinearAlgebra
 using Statistics
 using JLD2
 using ProgressMeter
+using PythonPlot
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
+num_rows = 6
+num_cols = 4
+fig, axes = subplots(6,4,figsize=(8,10))
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH17_615"
+filenames = readdir("results/outputs0117_elec")
+vahs = similar(filenames)
+for (i,file) in enumerate(filenames)
+    vah = split(file,"_")[1]
+    vahs[i] = vah
+end
+cells = unique(vahs)
+
+for (k,cell) in enumerate(cells)
+    println(cell)
+    row = Int(floor((k-1)/num_cols)) + 1
+    col = k%num_cols
+    if col == 0
+        col = 4
+    end
+cell_error_vec = Float64[]
+cycle_vec = Int[]
+strings = []
+for file in readdir("results/errors_0117")
+    inner_cell = split(file,"_")[1]
+    if inner_cell != cell
+        continue
+    end
+    f = split(file, "_errors.jld2")[1]
+    try
+        test1234234 = load("results/outputs0117_elec/$(f)_HMC.jld2")
+        d = load("results/errors_0117/$file")
+        rmse = d["rmse"]
+        append!(cell_error_vec, rmse)
+        cycle = parse(Int,split(file, "_")[2])
+        append!(cycle_vec, cycle*ones(1000))
+        for n in 1:1000
+            push!(strings, string(f))
+        end
+    catch
+        continue
+    end
+end
+
+sorted_cycles_by_error = cycle_vec[sortperm(cell_error_vec)]
+med = sorted_cycles_by_error[Int(floor(length(sorted_cycles_by_error)))]
+
+VAH = "$(cell)_$(med)"
 split1 = split(VAH,['H','_'])
-cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
@@ -60,7 +105,8 @@ interpolated_temperature = temperature_interpolant.(interpolated_time)
 
 #set up cycle arrays
 cycle_array = CellFitElectrolyte.current_profile(interpolated_current,interpolated_time)
-other_cycle_array = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"][cell][cycle]
+adsf = parse(Int, cell[end-1:end])
+other_cycle_array = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"][adsf][cycle]
 
 new_num_steps = Int(other_cycle_array[1])
 new_times = other_cycle_array[2:new_num_steps+1]
@@ -191,23 +237,25 @@ function fit_cfe(interpolated_voltage, nt)
     predicted = evaluator(p)
     return predicted
 end
-PythonPlot.matplotlib.rcParams["font.size"] = 16
+PythonPlot.matplotlib.rcParams["font.size"] = 10
 N = length(chain)
-fig, axes = subplots()
+
 rmse = zeros(N)
 i=1
 c = chain_to_nt(chain,i)
 predicted = fit_cfe(interpolated_voltage,c)
-axes.plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
-axes.plot(interpolated_time[1:end-1], predicted,color="xkcd:grey",label="Model")
+axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
+axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey",label="Model")
 @showprogress for i =2:N
     c = chain_to_nt(chain,i)
     predicted = fit_cfe(interpolated_voltage,c)
-    axes.plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
+    axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
 end
-axes.plot(interpolated_time, interpolated_voltage,color="tab:blue", label="Experiment")
-axes.legend()
-axes.set_xlabel("Time [sec]", fontsize=18)
-axes.set_ylabel("Cell voltage [V]", fontsize=18)
-axes.grid(alpha=0.5)
-fig.savefig("voltage_median.pdf",bbox_inches="tight")
+axes[row-1,col-1].plot(interpolated_time, interpolated_voltage,color="tab:blue", label="Experiment")
+axes[row-1,col-1].legend()
+axes[row-1,col-1].set_xlabel("Time [sec]", fontsize=18)
+axes[row-1,col-1].set_ylabel("Cell voltage [V]", fontsize=18)
+axes[row-1,col-1].grid(alpha=0.5)
+end
+fig.tight_layout()
+fig.savefig("figs/si/voltage_medians.png",bbox_inches="tight")
