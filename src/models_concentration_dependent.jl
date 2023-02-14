@@ -118,7 +118,7 @@ function concentration_overpotential(cₑ⁺,cₑ⁻,t⁺,Temp,Δx, TDF)
 end
 
 
-function calc_voltage_concentrationdependent( u, p, t, cache, cellgeometry, cathodeocv::RKPolynomial, anodeocv, Iapp)
+function calc_voltage_concentrationdependent( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCircuitVoltage, anodeocv, Iapp)
 
     cₛˢ⁻ = u[1]
     cₛᵇ⁻ = u[2]

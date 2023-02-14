@@ -80,7 +80,7 @@ function equations_electrolyte_allocating(du,u,p,t,cache,cellgeometry,cathodeocv
     return nothing
 end
 
-function calc_voltage( u, p, t, cache, cellgeometry, cathodeocv::RKPolynomial, anodeocv, Iapp)
+function calc_voltage( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCircuitVoltage, anodeocv, Iapp)
 
     cₛˢ⁻ = u[1]
     cₛᵇ⁻ = u[2]
