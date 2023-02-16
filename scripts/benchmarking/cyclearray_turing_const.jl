@@ -13,6 +13,8 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using PythonPlot
+using Statistics
 
 
 #DELETE
@@ -53,6 +55,8 @@ cycle_array_vector = CellFitElectrolyte.load_airbus_cyclearrays()
 cycle_array_vec = cycle_array_vector["cycle_array_vector"][cell]
 cycle_array_new = cycle_array_vec[cycle]
 const cycle_array = CellFitElectrolyte.truncate_cycle_array(5, cycle_array_new)
+#const cycle_array = CellFitElectrolyte.current_profile([3.,3.],[0.,3600.])
+#cycle_array = cycle_array_new
 const num_steps = Int(cycle_array[1])
 const times = cycle_array[2:num_steps+1]
 const types = cycle_array[num_steps+2:num_steps+1+num_steps]
@@ -123,8 +127,10 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
             x⁻::T = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
             if (x⁺ >= 1)
                 endV[step] = 50*x⁺
+                println("broken")
                 continue
             elseif (x⁻ >= 1)
+                println("broken")
                 endV[step] = 50*x⁻
                 continue
             end
@@ -158,6 +164,7 @@ function cycle_array_evaluator(p::ComponentVector{T}) where {T}
             #Simulate to the next timestop
             #try
                 while integrator.t < end_time
+                    #println(integrator.t)
                     step!(integrator)
                     Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv, integrator.u[8])
                     if ((Voltage >= p.vfull) & ((integrator.p.cccv_switch != true) & (input_type ==5)))
@@ -230,4 +237,11 @@ sleep(5)
 
 b = @benchmark cycle_array_evaluator(p)
 
-println(b)
+indices = sortperm(b.times)
+
+fig,axes = subplots()
+axes.hist(b.times[indices[1:end-3]]./1e9,density=true,bins=1000)
+axes.set_xlabel("Wall Time [s]")
+axes.set_ylabel("Density")
+fig.savefig("figs/si/benchmark_evtol.pdf",bbox_inches="tight")
+fig.savefig("figs/si/benchmark_evtol.png",bbox_inches="tight")
