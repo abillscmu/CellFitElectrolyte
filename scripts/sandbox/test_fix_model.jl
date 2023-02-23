@@ -13,70 +13,21 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
-using ProgressMeter
-using PythonPlot
 
 cache = CellFitElectrolyte.initialize_cache(Float64)
-num_rows = 6
-num_cols = 4
-fig, axes = subplots(6,4,figsize=(8,10))
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-filenames = readdir("results/outputs0117_elec")
-vahs = similar(filenames)
-for (i,file) in enumerate(filenames)
-    vah = split(file,"_")[1]
-    vahs[i] = vah
-end
-cells = unique(vahs)
-
-for (k,cell) in enumerate(cells)
-    println(cell)
-    row = Int(floor((k-1)/num_cols)) + 1
-    col = k%num_cols
-    if col == 0
-        col = 4
-    end
-cell_error_vec = Float64[]
-cycle_vec = Int[]
-strings = []
-for file in readdir("results/errors_0117")
-    inner_cell = split(file,"_")[1]
-    if inner_cell != cell
-        continue
-    end
-    f = split(file, "_errors.jld2")[1]
-    try
-        test1234234 = load("results/outputs0117_elec/$(f)_HMC.jld2")
-        d = load("results/errors_0117/$file")
-        rmse = d["rmse"]
-        append!(cell_error_vec, rmse)
-        cycle = parse(Int,split(file, "_")[2])
-        append!(cycle_vec, cycle*ones(1000))
-        for n in 1:1000
-            push!(strings, string(f))
-        end
-    catch
-        continue
-    end
-end
-
-sorted_cycles_by_error = cycle_vec[sortperm(cell_error_vec)]
-med = sorted_cycles_by_error[Int(floor(length(sorted_cycles_by_error)))]
-
-VAH = "$(cell)_$(med)"
+VAH = "VAH01_20"
 split1 = split(VAH,['H','_'])
+cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("/Users/abills/Datasets/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 #filter!(row->row.Ns>=4,df)
-
-d = load("results/outputs0117_elec/$(VAH)_HMC.jld2")
-chain = d["chain"]
 
 vfull = 4.2
 if cell==7
@@ -105,8 +56,7 @@ interpolated_temperature = temperature_interpolant.(interpolated_time)
 
 #set up cycle arrays
 cycle_array = CellFitElectrolyte.current_profile(interpolated_current,interpolated_time)
-adsf = parse(Int, cell[end-1:end])
-other_cycle_array = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"][adsf][cycle]
+other_cycle_array = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vector"][cell][cycle]
 
 new_num_steps = Int(other_cycle_array[1])
 new_times = other_cycle_array[2:new_num_steps+1]
@@ -126,6 +76,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     # Handle Initial Conditions
     u::Array{T,1}  = Array{T,1}(undef,7)
     CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
+    #return u
     Temp = df.TemperatureC[1].+273.15
     @pack! p = Temp
     du = similar(u)
@@ -134,7 +85,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     @pack! p = input_type,input_value
 
     #Create Function and Initialize Integrator
-    func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
+    func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
     integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times)
 
@@ -215,47 +166,79 @@ function evaluator(p::ComponentVector{T}) where {T}
     return endV
 end
 
-function chain_to_nt(chain,idx)
-    return (ω = chain[:ω].data[idx,1], εₑ⁺=chain[:εₑ⁺].data[idx,1],εₑ⁻ = chain[:εₑ⁻].data[idx,1], frac_sol_am_pos = chain[:frac_sol_am_pos].data[idx,1],frac_sol_am_neg=chain[:frac_sol_am_neg].data[idx,1])
-end
 
-function fit_cfe(interpolated_voltage, nt)
+
+
+
+function fit_cfe(vec)
+
+    θₛⁿ = vec[1]
+    θₛᵖ = vec[2]
+    θₑ = vec[3]
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    @unpack ω, εₑ⁺, εₑ⁻, frac_sol_am_pos, frac_sol_am_neg = nt
-
+    #ω ~ truncated(Normal(0.02, 0.001), 0.01, 0.05)
+    ω = vec[4]
     x⁻₀ = 0.6
+    
+    #coordinate transforms to stay in a nice area
+    #εₑ⁺ ~ Uniform(0.05, 0.5)
+    εₑ⁺ = vec[5]
+    #εₑ⁻ ~ Uniform(0.05, 0.5)
+    εₑ⁻ = vec[6]
+    #frac_sol_am_pos ~ Uniform(0.5, 1.0)
+    #frac_sol_am_neg ~ Uniform(0.5, 1.0)
+    frac_sol_am_pos = vec[7]
+    frac_sol_am_neg = vec[8]
+
+    κ = vec[9]
+
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 3.238105814128935e-8, θₑ = 5.6464068552786306e-7, θₛ⁺ = 6.547741580032837e-5, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 4175.451281358547, κ = 0.2025997972168558, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = θₛⁿ, θₑ = θₑ, θₛ⁺ = θₛᵖ, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 1000., κ = κ, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
+
+    # Observations.
+    #interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+
     return predicted
 end
-PythonPlot.matplotlib.rcParams["font.size"] = 10
-N = length(chain)
 
-rmse = zeros(N)
-i=1
-c = chain_to_nt(chain,i)
-predicted = fit_cfe(interpolated_voltage,c)
-axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
-axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey",label="Model")
-#@showprogress for i =2:N
-#    c = chain_to_nt(chain,i)
-#    predicted = fit_cfe(interpolated_voltage,c)
-#    axes[row-1,col-1].plot(interpolated_time[1:end-1], predicted,color="xkcd:grey")
-#end
-axes[row-1,col-1].plot(interpolated_time, interpolated_voltage,color="tab:blue", label="Experiment")
-axes[row-1,col-1].legend()
-axes[row-1,col-1].set_xlabel("Time [sec]", fontsize=18)
-axes[row-1,col-1].set_ylabel("Cell voltage [V]", fontsize=18)
-axes[row-1,col-1].grid(alpha=0.5)
+
+predicted = fit_cfe(interpolated_voltage)
+
+
+
+[9.083011990824314e-8, 4.882065444878806e-6, 0.0005461023009076725, 0.03433620706589757, 0.9405241587940202, 0.9270719936285006, 8.806917876188582, 8.601714488599779, 0.1346959901335123]
+parent = [2.6145309903155526e-10, 2.4126123473971843e-7, 0.00018203759659602146, 0.027302814250432884, 0.30579391025803365, 0.07328409664905508, 0.7695552367778169, 0.8598952621868902, 0.8464583490637971]
+ub = similar(parent)
+lb = similar(parent)
+for (i,p) in enumerate(parent)
+    ub[i] = 10*p
+    lb[i] = 0.1*p
 end
-fig.tight_layout()
-fig.savefig("figs/si/voltage_medians.png",bbox_inches="tight")
+
+ub[5:8] .= 1
+lb[5:8] .= 0.001
+
+#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
+
+# Sample 3 independent chains with forward-mode automatic differentiation (the default).
+#chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
+#d = Dict("chain" => chain)
+
+
+#save("$(VAH)_HMC.jld2", d)
+#sleep(5)
+
+
+predicted = fit_cfe(parent)
+fig, axes = subplots()
+axes.plot(interpolated_time[1:end-1], predicted)
+axes.plot(interpolated_time, interpolated_voltage)

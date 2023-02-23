@@ -108,6 +108,7 @@ function cell_geometry()
         Vₑ⁺ = W⁺*L⁺*T⁺,
         T⁺ = T⁺,
         T⁻ = T⁻,
+        Tˢ = Tˢ
 )
 
 end

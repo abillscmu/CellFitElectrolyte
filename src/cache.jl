@@ -10,7 +10,7 @@ function initialize_cache(T)
     A = zeros(T,7,7)
     du_transport = zeros(T,7)
     control = zeros(T,7)
-    controller = T.([-1,0,1,0,-1,1,0]./F)
+    controller = T.([-1,0,1,0,-1,0,1]./F)
     mm_cache = zeros(T,7)
 
     return cache(A,du_transport,control,controller,mm_cache)

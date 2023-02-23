@@ -27,6 +27,7 @@ include("SimulatedAnnealing.jl")
 include("models_allocating.jl")
 include("degradation_nn.jl")
 include("models_concentration_dependent.jl")
+include("models_allocating_new.jl")
 
 export simulate,initialize
 end # module
