@@ -115,7 +115,7 @@ function evaluator(p::ComponentVector{T}) where {T}
                 endV[step] = 50*x⁻
                 continue
             end
-            Voltage = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
+            Voltage = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
         else
             Voltage = endV[step-1]
         end
@@ -160,7 +160,7 @@ function evaluator(p::ComponentVector{T}) where {T}
             endV[step] = 50*x⁻
             continue
         end
-        endV[step] = CellFitElectrolyte.calc_voltage(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
+        endV[step] = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
         endt[step] = integrator.t
     end
     return endV
@@ -207,7 +207,7 @@ function fit_cfe(vec)
     # Observations.
     #interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
 
-    return predicted
+    return sqrt(mean((predicted .- interpolated_voltage[1:end-1]).^2))
 end
 
 
@@ -215,8 +215,14 @@ predicted = fit_cfe(interpolated_voltage)
 
 
 
-[9.083011990824314e-8, 4.882065444878806e-6, 0.0005461023009076725, 0.03433620706589757, 0.9405241587940202, 0.9270719936285006, 8.806917876188582, 8.601714488599779, 0.1346959901335123]
-parent = [2.6145309903155526e-10, 2.4126123473971843e-7, 0.00018203759659602146, 0.027302814250432884, 0.30579391025803365, 0.07328409664905508, 0.7695552367778169, 0.8598952621868902, 0.8464583490637971]
+θₛ⁻ = 2.2773163369671903e-10
+θₛ⁺ = 8.386302841923304e-8
+θₑ = 7.317105452243745e-5
+κ = 1.519711914467661
+
+
+
+parent = [2.2773163369671903e-10, 8.386302841923304e-8, 7.317105452243745e-5, 0.03371608975351428, 0.5091342674784902, 0.34267991405369447, 0.6525657193545743, 0.8252482635157101, 1.519711914467661]
 ub = similar(parent)
 lb = similar(parent)
 for (i,p) in enumerate(parent)
@@ -227,7 +233,7 @@ end
 ub[5:8] .= 1
 lb[5:8] .= 0.001
 
-#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
+CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
 #chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
@@ -236,9 +242,3 @@ lb[5:8] .= 0.001
 
 #save("$(VAH)_HMC.jld2", d)
 #sleep(5)
-
-
-predicted = fit_cfe(parent)
-fig, axes = subplots()
-axes.plot(interpolated_time[1:end-1], predicted)
-axes.plot(interpolated_time, interpolated_voltage)

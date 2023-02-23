@@ -68,8 +68,8 @@ function equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathod
     du_transport = vcat(du_NS, du_E, du_PS)
 
     #Apply current
-    controller_sn = 1/(cellgeometry.Vₛ⁻*εₛ⁻)
-    controller_sp = 1/(cellgeometry.Vₛ⁺*εₛ⁺)
+    controller_sn = (1-t⁺)/(cellgeometry.Vₛ⁻*εₛ⁻)
+    controller_sp = (1-t⁺)/(cellgeometry.Vₛ⁺*εₛ⁺)
     
     controller_mm = SVector(controller_sn, controller_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
 
@@ -118,8 +118,8 @@ function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCir
     a⁺ = 3 *εₛ⁺/R⁺
     A⁻ = 2 *Vₛ⁻*a⁻
     A⁺ = 2 *Vₛ⁺*a⁺
-    J⁻ = Iapp/A⁻
-    J⁺ = Iapp/A⁺
+    J⁻ = Iapp*(1-t⁺)/A⁻
+    J⁺ = Iapp*(1-t⁺)/A⁺
 
     #Calculate Voltages
     U⁺ = calcocv(cathodeocv,(cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min),Temp)
