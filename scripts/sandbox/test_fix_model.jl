@@ -71,7 +71,7 @@ values = cycle_array[num_steps+2+num_steps:num_steps+1+2*num_steps]
 
 
 
-cellgeometry = CellFitElectrolyte.cell_geometry()
+cellgeometry = CellFitElectrolyte.cell_geometry_new()
 function evaluator(p::ComponentVector{T}) where {T}
     # Handle Initial Conditions
     u::Array{T,1}  = Array{T,1}(undef,7)
@@ -207,7 +207,8 @@ function fit_cfe(vec)
     # Observations.
     #interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
 
-    return sqrt(mean((predicted .- interpolated_voltage[1:end-1]).^2))
+    #return sqrt(mean((predicted .- interpolated_voltage[1:end-1]).^2))
+    return predicted
 end
 
 
@@ -215,14 +216,14 @@ predicted = fit_cfe(interpolated_voltage)
 
 
 
-θₛ⁻ = 2.2773163369671903e-10
-θₛ⁺ = 8.386302841923304e-8
-θₑ = 7.317105452243745e-5
-κ = 1.519711914467661
+θₛ⁻ = 9.130391775012598e-10
+θₛ⁺ = 3.728671559985511e-9
+θₑ = 1.1945281772602951e-6
+κ = 0.9163280716276463
 
 
 
-parent = [2.2773163369671903e-10, 8.386302841923304e-8, 7.317105452243745e-5, 0.03371608975351428, 0.5091342674784902, 0.34267991405369447, 0.6525657193545743, 0.8252482635157101, 1.519711914467661]
+parent = [9.130391775012598e-10, 3.728671559985511e-9, 1.1945281772602951e-6, 0.023839296614361134, 0.4920330715539879, 0.17710752714128866, 0.9164726176006354, 0.806145521033499, 0.9163280716276463]
 ub = similar(parent)
 lb = similar(parent)
 for (i,p) in enumerate(parent)
@@ -231,9 +232,16 @@ for (i,p) in enumerate(parent)
 end
 
 ub[5:8] .= 1
-lb[5:8] .= 0.001
+lb[5:6] .= 0.1
+lb[7:8] .= 0.75
 
-CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
+predicted = fit_cfe(parent)
+
+fig, axes = subplots()
+axes.plot(interpolated_time[1:end-1],predicted,label="model")
+axes.plot(interpolated_time, interpolated_voltage,label="experiment")
+
+#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
 #chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)

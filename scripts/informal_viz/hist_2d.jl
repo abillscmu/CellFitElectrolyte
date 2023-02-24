@@ -2,9 +2,9 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/outputs0112_elec/"
+FOLDERNAME = "results/vah01_0223_transferance/"
 CELL = "VAH01"
-SYMBOL = :c_e_0
+SYMBOL = :εₑ⁺
 
 val = []
 cyc = []

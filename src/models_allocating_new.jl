@@ -140,7 +140,7 @@ function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCir
     #Calculate SEI Overpotential
     ηₛ = sei_ohmic(ω,Iapp)
     #Thermal Equations
-    V = U⁺-U⁻-η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ
+    V = U⁺-U⁻+η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ
     return V
 end
 
