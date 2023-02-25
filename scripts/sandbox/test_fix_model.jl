@@ -19,13 +19,13 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_20"
+VAH = "VAH01_100"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/$(VAH).csv",DataFrame)
+df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 #filter!(row->row.Ns>=4,df)
 
@@ -46,7 +46,7 @@ current_interpolant = LinearInterpolation(current,df.times)
 voltage_interpolant = LinearInterpolation(df.EcellV,df.times)
 temperature_interpolant = LinearInterpolation(df.TemperatureC.+273.15,df.times)
 
-interpolated_time = collect(range(df.times[1],stop=df.times[end],step=1.0))
+interpolated_time = collect(range(df.times[1],stop=df.times[end],step=5.0))
 
 
 interpolated_current = current_interpolant.(interpolated_time)
@@ -76,7 +76,6 @@ function evaluator(p::ComponentVector{T}) where {T}
     # Handle Initial Conditions
     u::Array{T,1}  = Array{T,1}(undef,7)
     CellFitElectrolyte.initial_conditions!(u,p,cellgeometry,initialcond,cathodeocv,anodeocv)
-    #return u
     Temp = df.TemperatureC[1].+273.15
     @pack! p = Temp
     du = similar(u)
@@ -87,7 +86,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     #Create Function and Initialize Integrator
     func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times, verbose=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -144,19 +143,28 @@ function evaluator(p::ComponentVector{T}) where {T}
         @pack! p = input_type,input_value
         while integrator.t < end_time
             step!(integrator)
+            if integrator.sol.retcode != :Default
+                println("hi")
+                endV[step:end] .= 50
+                return endV
+            end
         end
         if any(integrator.u .< 0)
-            endV[step] = integrator.u[findfirst(integrator.u .< 0)]
-            continue
+            #println(integrator.u)
+            endV[step:end] .= 50*integrator.u[findfirst(integrator.u .< 0)]
+            return endV
+            #continue
         end
         cₛˢ⁺ = integrator.u[7]
         cₛˢ⁻ = integrator.u[1]
         x⁺ = (cₛˢ⁺-cathodeocv.c_s_min)/(cathodeocv.c_s_max-cathodeocv.c_s_min)
         x⁻ = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
         if (x⁺ >= 1)
+            #println("yo")
             endV[step] = 50*x⁺
             continue
         elseif (x⁻ >= 1)
+            #println("dog")
             endV[step] = 50*x⁻
             continue
         end
@@ -170,83 +178,88 @@ end
 
 
 
-function fit_cfe(vec)
-
-    θₛⁿ = vec[1]
-    θₛᵖ = vec[2]
-    θₑ = vec[3]
+@model function fit_cfe(interpolated_voltage)
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    #ω ~ truncated(Normal(0.02, 0.001), 0.01, 0.05)
-    ω = vec[4]
+    ω ~ truncated(Normal(0.02, 0.001), 0.0, 0.05)
     x⁻₀ = 0.6
+
+    c_e_0 ~ truncated(Normal(1000, 500),1000,4000)
     
     #coordinate transforms to stay in a nice area
-    #εₑ⁺ ~ Uniform(0.05, 0.5)
-    εₑ⁺ = vec[5]
-    #εₑ⁻ ~ Uniform(0.05, 0.5)
-    εₑ⁻ = vec[6]
-    #frac_sol_am_pos ~ Uniform(0.5, 1.0)
-    #frac_sol_am_neg ~ Uniform(0.5, 1.0)
-    frac_sol_am_pos = vec[7]
-    frac_sol_am_neg = vec[8]
+    εₑ⁺ ~ Uniform(0.05, 0.75)
+    εₑ⁻ ~ Uniform(0.05, 0.5)
 
-    κ = vec[9]
-
+    frac_sol_am_pos ~ Uniform(0.1, 1.0)
+    frac_sol_am_neg ~ Uniform(0.1, 1.0)
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = θₛⁿ, θₑ = θₑ, θₛ⁺ = θₛᵖ, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 1000., κ = κ, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 2.5e-6, θₛ⁺ = 3.728671559985511e-9, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.9163280716276463, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
 
     # Observations.
-    #interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
 
-    #return sqrt(mean((predicted .- interpolated_voltage[1:end-1]).^2))
-    return predicted
+    return nothing
 end
 
 
-predicted = fit_cfe(interpolated_voltage)
-
-
-
-θₛ⁻ = 9.130391775012598e-10
-θₛ⁺ = 3.728671559985511e-9
-θₑ = 1.1945281772602951e-6
-κ = 0.9163280716276463
-
-
-
-parent = [9.130391775012598e-10, 3.728671559985511e-9, 1.1945281772602951e-6, 0.023839296614361134, 0.4920330715539879, 0.17710752714128866, 0.9164726176006354, 0.806145521033499, 0.9163280716276463]
-ub = similar(parent)
-lb = similar(parent)
-for (i,p) in enumerate(parent)
-    ub[i] = 10*p
-    lb[i] = 0.1*p
-end
-
-ub[5:8] .= 1
-lb[5:6] .= 0.1
-lb[7:8] .= 0.75
-
-predicted = fit_cfe(parent)
-
-fig, axes = subplots()
-axes.plot(interpolated_time[1:end-1],predicted,label="model")
-axes.plot(interpolated_time, interpolated_voltage,label="experiment")
-
-#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
+model = fit_cfe(interpolated_voltage)
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
-#chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
-#d = Dict("chain" => chain)
+chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
+d = Dict("chain" => chain)
 
 
 #save("$(VAH)_HMC.jld2", d)
 #sleep(5)
+
+#=
+εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
+εₛ⁺ = kde(chain[:εₛ⁺].data[:,1])
+εᵧ⁺ = kde(chain[:εᵧ⁺].data[:,1])
+εᵧ⁻ = kde(chain[:εᵧ⁻].data[:,1])
+ω = kde(chain[:ω].data[:,1])
+n_li = kde(chain[:n_li].data[:,1])
+
+
+
+figure(1);
+clf()
+subplot(321)
+plot(εₛ⁻.x, εₛ⁻.density)
+xlabel("εₛ⁻")
+ylabel("Density")
+grid()
+subplot(322)
+plot(ω.x, ω.density)
+ylabel("Density")
+xlabel("SEI Resistance")
+grid()
+subplot(323)
+plot(n_li.x,n_li.density)
+ylabel("Density")
+xlabel("Moles Li")
+grid()
+subplot(324)
+plot(εₛ⁺.x,εₛ⁺.density)
+ylabel("Density")
+xlabel("εₛ⁺")
+grid()
+subplot(325)
+plot(εᵧ⁺.x,εᵧ⁺.density)
+ylabel("Density")
+xlabel("εᵧ⁺")
+grid()
+subplot(326)
+plot(εᵧ⁻.x,εᵧ⁻.density)
+ylabel("Density")
+xlabel("εᵧ⁻")
+grid()
+=#
