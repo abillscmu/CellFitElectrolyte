@@ -212,7 +212,7 @@ function equations_electrolyte_life_allocating(du,u,p,t,cache,cellgeometry,catho
     mm_sn = 1/(cellgeometry.Vₛ⁻*εₛ⁻)
     mm_sp = 1/(cellgeometry.Vₛ⁺*εₛ⁺)
 
-    mm = SVector(mm_sn, mm_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), mm_sp, mm_sp)
+    mm = SVector(mm_sn, mm_sn, 1/(cellgeometry.T⁻*εₑ⁻), 1/(cellgeometry.Tˢ*εₑˢ), 1/(cellgeometry.T⁺*εₑ⁺), mm_sp, mm_sp)
 
     du[1:7] .= du_pre_mm .* mm
 
