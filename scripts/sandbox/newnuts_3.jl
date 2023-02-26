@@ -22,13 +22,14 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_8"
+cyc_num = parse(Int, ENV["SLURM_ARRAY_TASK_ID"])
+VAH = "VAH01_$cyc_num"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/jet/home/abills/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 #filter!(row->row.Ns>=4,df)
 
@@ -89,7 +90,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     #Create Function and Initialize Integrator
     func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = interpolated_time, verbose=false)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times, verbose=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -193,8 +194,6 @@ end
     #coordinate transforms to stay in a nice area
     εₑ⁺ ~ truncated(Normal(0.2, 0.05), 0.05, 0.5)
     εₑ⁻ ~ truncated(Normal(0.2, 0.05), 0.05, 0.5)
-    #εₑ⁻ = 0.2
-    #θₑ ~ truncated(Normal(3e-6,1e-7),1e-6,1e-5)
 
     frac_sol_am_pos ~ truncated(Normal(0.75, 0.1),0.5, 1.0)
     frac_sol_am_neg ~ truncated(Normal(0.75, 0.1),0.5, 1.0)
@@ -204,13 +203,13 @@ end
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 6.130391775012598e-10, θₑ = 3e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.5, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 8.171755792589775e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.9, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
 
     # Observations.
-    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.05)
 
     return nothing
 end
@@ -221,10 +220,10 @@ model = fit_cfe(interpolated_voltage)
 
 
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, NUTS(0.65), MCMCSerial(), 25, 1; progress=true)
+chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
 d = Dict("chain" => chain)
 
-save("results/PG_0225/$(VAH)_HMC.jld2", d)
+save("results/newnuts_3/$(VAH)_HMC.jld2", d)
 sleep(5)
 
 #=
