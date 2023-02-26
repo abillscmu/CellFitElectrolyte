@@ -19,7 +19,8 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_100"
+cyc_num = parse(Int, ENV["SLURM_ARRAY_TASK_ID"])
+VAH = "VAH01_$cyc_num"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -46,7 +47,7 @@ current_interpolant = LinearInterpolation(current,df.times)
 voltage_interpolant = LinearInterpolation(df.EcellV,df.times)
 temperature_interpolant = LinearInterpolation(df.TemperatureC.+273.15,df.times)
 
-interpolated_time = collect(range(df.times[1],stop=df.times[end],step=5.0))
+interpolated_time = collect(range(df.times[1],stop=df.times[end],step=1.0))
 
 
 interpolated_current = current_interpolant.(interpolated_time)
@@ -187,8 +188,8 @@ end
     c_e_0 ~ truncated(Normal(1000, 500),1000,4000)
     
     #coordinate transforms to stay in a nice area
-    εₑ⁺ ~ Uniform(0.05, 0.75)
-    εₑ⁻ ~ Uniform(0.05, 0.5)
+    εₑ⁺ ~ Uniform(0.001, 0.75)
+    εₑ⁻ ~ Uniform(0.001, 0.75)
 
     frac_sol_am_pos ~ Uniform(0.1, 1.0)
     frac_sol_am_neg ~ Uniform(0.1, 1.0)
@@ -198,13 +199,13 @@ end
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 2.5e-6, θₛ⁺ = 3.728671559985511e-9, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 0.002885522176210856, k₀⁻ = 1.7219544782420964, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.9163280716276463, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 1e-9, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.01, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
 
     # Observations.
-    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.05)
 
     return nothing
 end
@@ -212,13 +213,21 @@ end
 
 model = fit_cfe(interpolated_voltage)
 
+θ = (
+    ω = 0.02,
+    c_e_0 = 1000,
+    εₑ⁺ = 0.2,
+    εₑ⁻ = 0.2,
+    frac_sol_am_pos = 0.75,
+    frac_sol_am_neg = 0.75,
+)
+
 # Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
+chain = sample(model, PG(100), MCMCSerial(), 10000, 3; progress=true, θ = θ)
 d = Dict("chain" => chain)
 
-
-#save("$(VAH)_HMC.jld2", d)
-#sleep(5)
+save("results/PG_0225/$(VAH)_HMC.jld2", d)
+sleep(5)
 
 #=
 εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
