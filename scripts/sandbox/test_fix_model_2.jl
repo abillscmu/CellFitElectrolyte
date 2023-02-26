@@ -14,15 +14,12 @@ using LinearAlgebra
 using Statistics
 using JLD2
 
-using Random
-Random.seed!(14)
-
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_8"
+VAH = "VAH01_800"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -89,7 +86,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     #Create Function and Initialize Integrator
     func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = interpolated_time, verbose=false)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times, verbose=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -147,7 +144,7 @@ function evaluator(p::ComponentVector{T}) where {T}
         while integrator.t < end_time
             step!(integrator)
             if integrator.sol.retcode != :Default
-                println("hi")
+                #println("hi")
                 endV[step:end] .= 50
                 return endV
             end
@@ -164,13 +161,12 @@ function evaluator(p::ComponentVector{T}) where {T}
         x⁻ = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
         if (x⁺ >= 1)
             #println("yo")
-            endV[step:end] .= 50*x⁺
-            return endV
-            #continue
+            endV[step] = 50*x⁺
+            continue
         elseif (x⁻ >= 1)
             #println("dog")
-            endV[step:end] .= 50*x⁺
-            return endV
+            endV[step] = 50*x⁻
+            continue
         end
         endV[step] = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
         endt[step] = integrator.t
@@ -182,22 +178,19 @@ end
 
 
 
-@model function fit_cfe(interpolated_voltage)
+function fit_cfe(vec)
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    ω ~ truncated(Normal(0.02, 0.01), 0.01, 0.1)
+    ω, εₑ⁺, εₑ⁻, frac_sol_am_neg, frac_sol_am_pos  = vec
+    #ω = 0.02
     x⁻₀ = 0.6
+    
+    
+    #εₑ⁻ = 0.2
 
-    c_e_0 = 1000.0
+    c_e_0 = 1000
     
     #coordinate transforms to stay in a nice area
-    εₑ⁺ ~ truncated(Normal(0.2, 0.05), 0.05, 0.5)
-    εₑ⁻ ~ truncated(Normal(0.2, 0.05), 0.05, 0.5)
-    #εₑ⁻ = 0.2
-    #θₑ ~ truncated(Normal(3e-6,1e-7),1e-6,1e-5)
-
-    frac_sol_am_pos ~ truncated(Normal(0.75, 0.1),0.5, 1.0)
-    frac_sol_am_neg ~ truncated(Normal(0.75, 0.1),0.5, 1.0)
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
@@ -210,63 +203,24 @@ end
     predicted = evaluator(p)
 
     # Observations.
-    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+    rmse = sqrt(mean((interpolated_voltage[1:end-1] .- predicted).^2))
 
-    return nothing
+    return rmse
 end
 
+parent = [0.02995772841645211, 0.2621967212506595, 0.2772786249050178, 0.6686674852673185, 0.6498228295227081]
+lb = 0.1 .* parent
+ub = 10 .* parent
+#ub = Float64[1e-3,2000,1.,1.,1.]
+lb[2:5] .= 0
+ub[2:5] .= 1
+#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
 
-model = fit_cfe(interpolated_voltage)
 
 
-
-# Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, NUTS(0.65), MCMCSerial(), 25, 1; progress=true)
-d = Dict("chain" => chain)
-
-save("$(VAH)_HMC.jld2", d)
-sleep(5)
-
+predicted = fit_cfe(parent)
 #=
-εₛ⁻ = kde(chain[:εₛ⁻].data[:,1])
-εₛ⁺ = kde(chain[:εₛ⁺].data[:,1])
-εᵧ⁺ = kde(chain[:εᵧ⁺].data[:,1])
-εᵧ⁻ = kde(chain[:εᵧ⁻].data[:,1])
-ω = kde(chain[:ω].data[:,1])
-n_li = kde(chain[:n_li].data[:,1])
-
-
-
-figure(1);
-clf()
-subplot(321)
-plot(εₛ⁻.x, εₛ⁻.density)
-xlabel("εₛ⁻")
-ylabel("Density")
-grid()
-subplot(322)
-plot(ω.x, ω.density)
-ylabel("Density")
-xlabel("SEI Resistance")
-grid()
-subplot(323)
-plot(n_li.x,n_li.density)
-ylabel("Density")
-xlabel("Moles Li")
-grid()
-subplot(324)
-plot(εₛ⁺.x,εₛ⁺.density)
-ylabel("Density")
-xlabel("εₛ⁺")
-grid()
-subplot(325)
-plot(εᵧ⁺.x,εᵧ⁺.density)
-ylabel("Density")
-xlabel("εᵧ⁺")
-grid()
-subplot(326)
-plot(εᵧ⁻.x,εᵧ⁻.density)
-ylabel("Density")
-xlabel("εᵧ⁻")
-grid()
+fig, ax = subplots()
+ax.plot(interpolated_time[1:end-1], predicted)
+ax.plot(interpolated_time, interpolated_voltage)
 =#

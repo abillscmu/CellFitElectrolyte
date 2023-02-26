@@ -71,7 +71,7 @@ function equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathod
     controller_sn = (1-t⁺)/(cellgeometry.Vₛ⁻*εₛ⁻)
     controller_sp = (1-t⁺)/(cellgeometry.Vₛ⁺*εₛ⁺)
     
-    controller_mm = SVector(controller_sn, controller_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
+    controller_mm = SVector(controller_sn, controller_sn, (1-t⁺)/(cellgeometry.Vₑ⁻*εₑ⁻), (1-t⁺)/(cellgeometry.Vₑˢ*εₑˢ), (1-t⁺)/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
 
 
     cache_control = cache.controller*Iapp.*controller_mm
