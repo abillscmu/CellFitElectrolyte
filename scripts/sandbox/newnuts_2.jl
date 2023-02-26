@@ -14,6 +14,9 @@ using LinearAlgebra
 using Statistics
 using JLD2
 
+using Random
+Random.seed!(14)
+
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
@@ -28,7 +31,7 @@ cycle = parse(Int,split1[3])
 
 df = CSV.read("/jet/home/abills/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
-#filter!(row->row.Ns>=4,df)
+filter!(row->row.Ns>=4,df)
 
 vfull = 4.2
 if cell==7
@@ -47,7 +50,7 @@ current_interpolant = LinearInterpolation(current,df.times)
 voltage_interpolant = LinearInterpolation(df.EcellV,df.times)
 temperature_interpolant = LinearInterpolation(df.TemperatureC.+273.15,df.times)
 
-interpolated_time = collect(range(df.times[1],stop=df.times[end],step=2.0))
+interpolated_time = collect(range(df.times[1],stop=df.times[end],step=1.0))
 
 
 interpolated_current = current_interpolant.(interpolated_time)
@@ -183,7 +186,7 @@ end
 @model function fit_cfe(interpolated_voltage)
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    ω ~ Uniform(0.0, 0.05)
+    ω ~ truncated(Normal(0.02, 0.01), 0.01, 0.1)
     x⁻₀ = 0.6
 
     c_e_0 = 1000.0
@@ -200,7 +203,7 @@ end
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 8.171755792589775e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.1979507914169316, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 9.130391775012598e-10, θₑ = 8.171755792589775e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 1.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.9, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
@@ -226,7 +229,7 @@ model = fit_cfe(interpolated_voltage)
 chain = sample(model, NUTS(0.65), MCMCSerial(), 1000, 1; progress=true)
 d = Dict("chain" => chain)
 
-save("results/newnuts/$(VAH)_HMC.jld2", d)
+save("results/newnuts_2/$(VAH)_HMC.jld2", d)
 sleep(5)
 
 #=
