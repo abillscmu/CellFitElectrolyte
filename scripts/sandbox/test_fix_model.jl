@@ -19,8 +19,12 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
+<<<<<<< HEAD
 cyc_num = parse(Int, ENV["SLURM_ARRAY_TASK_ID"])
 VAH = "VAH01_$cyc_num"
+=======
+VAH = "VAH01_2"
+>>>>>>> 3a45712de0527c1fc1bb4f7b703383cf71460486
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
