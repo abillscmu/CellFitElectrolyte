@@ -19,7 +19,7 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_800"
+VAH = "VAH01_300"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])

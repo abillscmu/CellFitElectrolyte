@@ -1,6 +1,6 @@
 using JLD2, Turing, CellFitElectrolyte, KDEDistributions, KernelDensity, CellFitElectrolyte.OCV
 
-FOLDERNAME = "results/outputs0117_elec/"
+FOLDERNAME = "results/newnuts_5/"
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
@@ -45,7 +45,7 @@ for file in readdir(FOLDERNAME)
                 εₑ⁺ = chain[:εₑ⁺].data[:,1]
                 frac_sol_am_pos = chain[:frac_sol_am_pos].data[:,1]
                 frac_sol_am_neg = chain[:frac_sol_am_neg].data[:,1]
-                c_e_0 = 4000
+                c_e_0 = 2000
             
                 V = 4.2
                 x⁻₀ = 0.6

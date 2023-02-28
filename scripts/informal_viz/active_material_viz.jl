@@ -1,7 +1,7 @@
 using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 
-FOLDERNAME = "results/outputs0106_fullcyc/"
+FOLDERNAME = "results/newnuts_5/"
 CELL = "VAH01"
 
 val = []
@@ -17,10 +17,10 @@ for cell in 0:2500
     chain = try
         d = load(cell_to_load)
         chain = d["chain"]
-        εₑ⁻ = chain[:εₑ⁻].data[:, 1]
-        frac_sol_am_neg = chain[:frac_sol_am_neg].data[:, 1]
-        εₛ⁻ = (1 .- εₑ⁻).*frac_sol_am_neg
-        append!(val, εₛ⁻)
+        εₑ⁺ = chain[:εₑ⁺].data[:, 1]
+        frac_sol_am_pos = chain[:frac_sol_am_pos].data[:, 1]
+        εₛ⁺ = (1 .- εₑ⁺).*frac_sol_am_pos
+        append!(val, εₛ⁺)
         append!(cyc, cell*ones(1000))
     catch
         @warn "problem with $cell"

@@ -22,14 +22,18 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH01_2"
+VAH = "VAH01_800"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/Users/abills/Datasets/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
+
+d = load("results/newnuts_5/$(VAH)_HMC.jld2")
+chain = d["chain"]
+
 #filter!(row->row.Ns>=4,df)
 
 vfull = 4.2
@@ -181,46 +185,41 @@ end
 
 
 
+function chain_to_nt(chain,idx)
+    return (ω = chain[:ω].data[idx,1], εₑ⁺=chain[:εₑ⁺].data[idx,1],εₑ⁻ = chain[:εₑ⁻].data[idx,1], frac_sol_am_pos = chain[:frac_sol_am_pos].data[idx,1],frac_sol_am_neg=chain[:frac_sol_am_neg].data[idx,1])
+end
 
-@model function fit_cfe(interpolated_voltage)
+function fit_cfe(interpolated_voltage, nt)
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    ω ~ truncated(Normal(0.02, 0.01), 0.01, 0.1)
+    @unpack ω, εₑ⁺, εₑ⁻, frac_sol_am_pos, frac_sol_am_neg = nt
+
     x⁻₀ = 0.6
-
-    c_e_0 = 2000.0
-    
-    #coordinate transforms to stay in a nice area
-    εₑ⁺ ~ truncated(Normal(0.25, 0.05), 0.01, 0.5)
-    εₑ⁻ ~ truncated(Normal(0.25, 0.05), 0.01, 0.5)
-    #εₑ⁻ = 0.2
-    #θₑ ~ truncated(Normal(3e-6,1e-7),1e-6,1e-5)
-
-    frac_sol_am_pos ~ truncated(Normal(1, 0.1),0.5, 1.0)
-    frac_sol_am_neg ~ truncated(Normal(1, 0.1),0.5, 1.0)
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 6.130391775012598e-10, θₑ = 3e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.25, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 1.2e-9, θₑ = 5e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = 2000, κ = 0.25, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
 
     # Observations.
-    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
-
-    return nothing
+    RMSE = sqrt(sum((interpolated_voltage[1:end-1] .- predicted).^2)./length(predicted))
+    return predicted
 end
 
-
-model = fit_cfe(interpolated_voltage)
-
-
-
-# Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, NUTS(0.65), MCMCSerial(), 25, 1; progress=true)
-d = Dict("chain" => chain)
-
+N = length(chain)
+using PythonPlot
+c = chain_to_nt(chain,1)
+predicted = fit_cfe(interpolated_voltage,c)
+fig, ax = subplots()
+ax.plot(interpolated_time[1:end-1], predicted, color="tab:grey")
+for i =2:N
+    c = chain_to_nt(chain,i)
+    predicted = fit_cfe(interpolated_voltage,c)
+    ax.plot(interpolated_time[1:end-1], predicted, color="tab:grey")
+end
+ax.plot(interpolated_time, interpolated_voltage, color="tab:blue")
