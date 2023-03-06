@@ -71,7 +71,7 @@ function equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathod
     controller_sn = (1-t⁺)/(cellgeometry.Vₛ⁻*εₛ⁻)
     controller_sp = (1-t⁺)/(cellgeometry.Vₛ⁺*εₛ⁺)
     
-    controller_mm = SVector(controller_sn, controller_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
+    controller_mm = SVector(controller_sn, controller_sn, (1-t⁺)/(cellgeometry.Vₑ⁻*εₑ⁻), (1-t⁺)/(cellgeometry.Vₑˢ*εₑˢ), (1-t⁺)/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
 
 
     cache_control = cache.controller*Iapp.*controller_mm
@@ -157,4 +157,107 @@ function get_δ_from_eps_gamma(R, εᵧ, V)
     δ = ((R^3)*Vᵧ+(R^3))-R
     return δ
 end
+
+
+
+
+function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
+    cₛˢ⁻,cₛᵇ⁻,cₑ⁻,cₑˢ,cₑ⁺,cₛᵇ⁺,cₛˢ⁺ = @view u[1:7]
+    @unpack Temp = p
+    @unpack input_type,input_value = p
+    Iapp = u[8]
+
+
+    #Transport Parameters
+    @unpack θₛ⁻,θₑ,θₛ⁺ = p
+    @unpack β⁻,βˢ,β⁺ = p
+    @unpack Eₛ⁺, Eₛ⁻, Eₑ = p
+    #Kinetic Parameters
+    @unpack k₀⁺,k₀⁻ = p
+    #Thermal Parameters
+    @unpack c,h = p
+    #Electrolyte Parameters
+    @unpack κ,t⁺ = p
+
+    #Geometry
+    @unpack R⁺,R⁻ = p
+    @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
+    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
+    @unpack εᵧ⁺,εᵧ⁻ = p
+    εₑ⁻ = 1-εₛ⁻-εᵧ⁻
+    εₑ⁺ = 1-εₛ⁺-εᵧ⁺
+
+
+    #Geometry
+    a⁻ = 3*εₛ⁻/R⁻
+    a⁺ = 3*εₛ⁺/R⁺
+    A⁻ = 2Vₛ⁻*a⁻
+    A⁺ = 2Vₛ⁺*a⁺
+    
+    J⁻ = Iapp/A⁻
+    J⁺ = Iapp/A⁺
+
+    @fastmath pos = εₑ⁺^β⁺
+    @fastmath neg = εₑ⁻^β⁻
+
+    #Fill transport and apply bruggeman corrections (and temp later)
+    A_NS = SMatrix{2,2}(-θₛ⁻, θₛ⁻, θₛ⁻, -θₛ⁻) * exp(Eₛ⁻/293-Eₛ⁻/Temp)
+    A_PS = SMatrix{2,2}(-θₛ⁺, θₛ⁺, θₛ⁺, -θₛ⁺) * exp(Eₛ⁺/293-Eₛ⁺/Temp)
+    A_E = SMatrix{3,3}(-θₑ*neg, θₑ*neg, 0, θₑ*neg, -θₑ*(neg+pos), θₑ*pos, 0, θₑ*pos, -θₑ*pos) * exp(Eₑ/293-Eₑ/Temp)
+
+    du_NS = A_NS * (@view u[1:2])
+    du_E = A_E * (@view u[3:5])
+    du_PS = A_PS * (@view u[6:7])
+    du_transport = vcat(du_NS, du_E, du_PS)
+
+    #Apply current
+    controller_sn = (1-t⁺)/(cellgeometry.Vₛ⁻*εₛ⁻)
+    controller_sp = (1-t⁺)/(cellgeometry.Vₛ⁺*εₛ⁺)
+    
+    controller_mm = SVector(controller_sn, controller_sn, (1-t⁺)/(cellgeometry.Vₑ⁻*εₑ⁻), (1-t⁺)/(cellgeometry.Vₑˢ*εₑˢ), (1-t⁺)/(cellgeometry.Vₑ⁺*εₑ⁺), controller_sp, controller_sp)
+
+
+    cache_control = cache.controller*Iapp.*controller_mm
+    mm_sn = 1/(cellgeometry.Vₛ⁻*0.1)
+    mm_sp = 1/(cellgeometry.Vₛ⁺*0.5)
+    mm = SVector(mm_sn, mm_sn, 1/(cellgeometry.Vₑ⁻*εₑ⁻), 1/(cellgeometry.Vₑˢ*εₑˢ), 1/(cellgeometry.Vₑ⁺*εₑ⁺), mm_sp, mm_sp)
+    du_transport = du_transport .* mm
+    du[1:7] = du_transport + cache_control
+
+
+    if input_type==0
+        du[8] = Iapp-0
+    elseif input_type==1
+        Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
+        du[8] = input_value-(Iapp*Voltage)
+    elseif input_type==2
+        Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
+        du[8] = input_value-Voltage 
+    elseif input_type==3
+        du[8] = Iapp-input_value;
+    elseif input_type==4
+        du[8] = Iapp-0
+    elseif input_type==5
+        if p.cccv_switch == true
+            if p.cccv_switch_2 == true
+                du[8] = Iapp - 0
+            else
+                Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
+                du[8] = Voltage - p.vfull
+            end
+        else
+            du[8] = Iapp - input_value
+        end
+    else
+        @warn "condition not recognized"
+        du[8] = Iapp-0
+    end
+    return nothing
+end
+
+
+
+
+
+
 

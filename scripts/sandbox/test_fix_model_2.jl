@@ -14,16 +14,12 @@ using LinearAlgebra
 using Statistics
 using JLD2
 
-using Random
-Random.seed!(14)
-
 cache = CellFitElectrolyte.initialize_cache(Float64)
 
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-cyc_num = parse(Int, ENV["SLURM_ARRAY_TASK_ID"])
-VAH = "VAH01_$cyc_num"
+VAH = "VAH01_300"
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -90,7 +86,7 @@ function evaluator(p::ComponentVector{T}) where {T}
     #Create Function and Initialize Integrator
     func = ODEFunction((du, u, p, t)->CellFitElectrolyte.equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv))
     prob = ODEProblem(func,u,(0.0,times[end]),p)
-    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = interpolated_time, verbose=false)
+    integrator = init(prob,QNDF(autodiff=false),save_everystep=false, tstops = times, verbose=false)
 
     #we're really only interested in temperature and voltage, so we'll just save those
     endV::Array{T,1} = Array{T,1}(undef,length(interpolated_voltage)-1)
@@ -148,7 +144,7 @@ function evaluator(p::ComponentVector{T}) where {T}
         while integrator.t < end_time
             step!(integrator)
             if integrator.sol.retcode != :Default
-                println("hi")
+                #println("hi")
                 endV[step:end] .= 50
                 return endV
             end
@@ -165,13 +161,12 @@ function evaluator(p::ComponentVector{T}) where {T}
         x⁻ = (cₛˢ⁻-anodeocv.c_s_min)/(anodeocv.c_s_max-anodeocv.c_s_min)
         if (x⁺ >= 1)
             #println("yo")
-            endV[step:end] .= 50*x⁺
-            return endV
-            #continue
+            endV[step] = 50*x⁺
+            continue
         elseif (x⁻ >= 1)
             #println("dog")
-            endV[step:end] .= 50*x⁺
-            return endV
+            endV[step] = 50*x⁻
+            continue
         end
         endV[step] = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,values[step])
         endt[step] = integrator.t
@@ -183,45 +178,49 @@ end
 
 
 
-@model function fit_cfe(interpolated_voltage)
+function fit_cfe(vec)
     # Prior distributions.
     #n_li ~ truncated(Normal(0.2, 0.01), 0.16, 0.22)
-    ω ~ truncated(Normal(0.02, 0.01), 0.01, 0.1)
+    ω, εₑ⁺, εₑ⁻, frac_sol_am_neg, frac_sol_am_pos  = vec
+    #ω = 0.02
     x⁻₀ = 0.6
+    
+    
+    #εₑ⁻ = 0.2
 
-    c_e_0 = 2000.0
+    c_e_0 = 1000
     
     #coordinate transforms to stay in a nice area
-    εₑ⁺ ~ truncated(Normal(0.25, 0.05), 0.01, 0.5)
-    εₑ⁻ ~ truncated(Normal(0.25, 0.05), 0.01, 0.5)
-    #εₑ⁻ = 0.2
-    #θₑ ~ truncated(Normal(3e-6,1e-7),1e-6,1e-5)
-
-    frac_sol_am_pos ~ truncated(Normal(1, 0.1),0.5, 1.0)
-    frac_sol_am_neg ~ truncated(Normal(1, 0.1),0.5, 1.0)
 
     εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
     εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
     εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
     εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
-    p = ComponentVector(θₛ⁻ = 6.130391775012598e-10, θₑ = 3e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.25, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
+    p = ComponentVector(θₛ⁻ = 6.130391775012598e-10, θₑ = 3e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = x⁻₀, εₑˢ = 0.8, cₑ₀ = c_e_0, κ = 0.5, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0)
     
     
     predicted = evaluator(p)
 
     # Observations.
-    interpolated_voltage[1:end-1] ~ MvNormal(predicted, 0.1)
+    rmse = sqrt(mean((interpolated_voltage[1:end-1] .- predicted).^2))
 
-    return nothing
+    return rmse
 end
 
+parent = [0.02995772841645211, 0.2621967212506595, 0.2772786249050178, 0.6686674852673185, 0.6498228295227081]
+lb = 0.1 .* parent
+ub = 10 .* parent
+#ub = Float64[1e-3,2000,1.,1.,1.]
+lb[2:5] .= 0
+ub[2:5] .= 1
+#CellFitElectrolyte.anneal(fit_cfe, parent, ub, lb)
 
-model = fit_cfe(interpolated_voltage)
 
 
-
-# Sample 3 independent chains with forward-mode automatic differentiation (the default).
-chain = sample(model, NUTS(0.65), MCMCSerial(), 25, 1; progress=true)
-d = Dict("chain" => chain)
-
+predicted = fit_cfe(parent)
+#=
+fig, ax = subplots()
+ax.plot(interpolated_time[1:end-1], predicted)
+ax.plot(interpolated_time, interpolated_voltage)
+=#

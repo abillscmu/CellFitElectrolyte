@@ -2,9 +2,9 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/vah01_0223_transferance/"
+FOLDERNAME = "results/newnuts_5/"
 CELL = "VAH01"
-SYMBOL = :εₑ⁺
+SYMBOL = :εₑ⁻
 
 val = []
 cyc = []
@@ -29,7 +29,7 @@ end
 
 figure(1)
 clf()
-hist2D(cyc, val, bins=100)
+hist2D(cyc, val, bins=100, vmin=0.0, vmax=400.0)
 colorbar(label="Density")
 grid(alpha=0.8)
 xlabel("Cycle Number")

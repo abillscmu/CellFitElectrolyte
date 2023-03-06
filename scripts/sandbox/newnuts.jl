@@ -26,7 +26,7 @@ cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
 
 
-df = CSV.read("data/cycle_individual_data/$(VAH).csv",DataFrame)
+df = CSV.read("/jet/home/abills/cycle_individual_data/$(VAH).csv",DataFrame)
 df.times = df.times.-df.times[1]
 #filter!(row->row.Ns>=4,df)
 

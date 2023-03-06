@@ -8,7 +8,7 @@ mycolors = ["blue","orange","green"]
 
 nrow = length(ys)
 ncol = length(xs)
-CELL = "VAH30"
+CELL = "VAH01"
 
 low = minimum(data_dict[CELL]["cycles"])
 mid = median(data_dict[CELL]["cycles"])
