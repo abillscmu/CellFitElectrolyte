@@ -66,7 +66,6 @@ total_cycs = []
             diagnoses[cycle, j] += distance
         end
     end
-    #=
     cycles = 5:max_cycle
     sig_tau_vec = [1.96 for N in 5:max_cycle]
     nrows=8
@@ -77,7 +76,7 @@ total_cycs = []
     total_cycs = Array{Float64}(total_cycs)
     for j in 1:size(diagnoses)[2]
         ax[j-1].imshow(Array(diagnoses[5:end,j]'),aspect="auto",interpolation="none",cmap=mpl.colormaps["Greys"], vmin=0, vmax=1)
-        ax[j-1].text(-0.01, 0.0, deg_df.Name[j], va="center", ha="right", fontsize=16)
+        ax[j-1].text(-0.01, 0.0, deg_df.Name[j]*"  ", va="center", ha="right", fontsize=16)
         ax[j-1].axes.get_yaxis().set_visible(false)
         ax[j-1].axes.get_xaxis().set_visible(false)
     end
@@ -89,9 +88,8 @@ total_cycs = []
     ax[-1].axes.get_xaxis().set_visible(true)
     ax[-1].tick_params(labelsize=16)
     #fig.tight_layout()
-    savefig("figs/$(cell)_diagnosis.png",bbox_inches="tight")
-    savefig("figs/$(cell)_diagnosis.pdf",bbox_inches="tight")
+    savefig("figs/diagnosis/$(cell)_diagnosis.png",bbox_inches="tight")
+    savefig("figs/diagnosis/$(cell)_diagnosis.pdf",bbox_inches="tight")
     #fig.savefig("$cell.png")
-    =#
     celldict[cell] = diagnoses
 end

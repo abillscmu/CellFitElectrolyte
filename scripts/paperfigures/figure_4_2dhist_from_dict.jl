@@ -6,7 +6,8 @@ PythonPlot.matplotlib.rcParams["font.size"] = 10
 
 
 FOLDERNAME = "results/outputs0117_elec/"
-CELLS = ["VAH07","VAH09","VAH10","VAH11","VAH13","VAH15","VAH16","VAH17","VAH20","VAH22","VAH23","VAH24","VAH25","VAH26","VAH27","VAH28"]
+CELLS = ["VAH07", "VAH09", "VAH10", "VAH11", "VAH13", "VAH15", "VAH16", "VAH17", "VAH20", "VAH22", "VAH23", "VAH24", "VAH25", "VAH26", "VAH27", "VAH28"]
+#CELLS = ["VAH01", "VAH02"]
 SYMBOLS = SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
 num_rows = length(SYMBOLS)
 num_cols = length(CELLS)
@@ -17,7 +18,7 @@ ylimits = Dict(
     :εₑ⁺ => pylist([0.05, 0.5]),
     :frac_sol_am_pos => pylist([0.5,1.0]),
     :frac_sol_am_neg => pylist([0.5,1.0]),
-    :n_li => pylist([0.13, 0.22]),
+    :n_li => pylist([0.05, 0.2  ]),
     :εₛ⁺ => pylist([0.25, 0.95]),
     :εₛ⁻ => pylist([0.25, 0.95])
 )
@@ -49,15 +50,19 @@ for (j,CELL) in enumerate(CELLS)
         for cell in 0:2500
         try
             data = data_dict[CELL]["distributions"][cell][SYMBOL].data
-            append!(val, data)
-            append!(cyc, cell*ones(1000))
+            if length(data) != 1000
+                continue
+            else
+                append!(val, data)
+                append!(cyc, cell.*ones(1000))
+            end  
         catch
             @warn "problem with $cell"
             continue
         end
     end
 
-    axes[i-1,j-1].hist2d(cyc, val, bins=100, range=pylist([xlimit_thiscell, ylimit_thissym]))
+    axes[i-1,j-1].hexbin(cyc, val, gridsize=100, extent=pytuple((xlimit_thiscell[0], xlimit_thiscell[1], ylimit_thissym[0], ylimit_thissym[1])), mincnt = 10)
     #colorbar(label="Density")
     #grid(0.2)
     if i == num_rows
@@ -112,5 +117,5 @@ for (j,CELL) in enumerate(CELLS)
 end
 end 
 #tight_layout()
-savefig("figs/si/2dhist_final.png", bbox_inches="tight")
-savefig("figs/si/2dhist_final.pdf", bbox_inches="tight")
+savefig("figs/real/2dhist_supp.png", bbox_inches="tight")
+savefig("figs/real/2dhist_supp.pdf", bbox_inches="tight")

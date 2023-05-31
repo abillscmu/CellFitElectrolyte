@@ -1,8 +1,8 @@
 using PythonPlot, Statistics, PythonCall
 
 
+ys = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
 xs = ["Max Temperature", "Max DOD", "Max Current", "Cycle Life","Mean Temperature", "Min Current"]
-ys = ["Max Temperature", "Max DOD", "Max Current", "Cycle Life","Mean Temperature", "Min Current"]
 
 
 nrow = length(ys)
@@ -13,7 +13,7 @@ ylabeltextarr = Array{String}(undef, nrow)
 
 
 x_type = "absolute"
-y_type = "experimental"
+y_type = "delta_N"
 
 cells = [k for k in keys(data_dict)]
 
@@ -101,17 +101,20 @@ for (j,x) in enumerate(xs)
     #fig.tight_layout()
 end
 
-fig, ax = subplots()
-ax.imshow(Z,aspect="auto")
-
+fig, ax = subplots(figsize=(8,6.4))
+cmap = PythonPlot.matplotlib.colormaps["PRGn"]
+pcm = ax.imshow(Z,aspect="auto", cmap=cmap)
+colorbar(pcm, ax=ax)
+#=
 for i in 1:nrow
     for j in 1:ncol
         text(j-1, i-1, Z[i, j], ha="center", va="center", color="w",fontsize=13)
     end
 end
+=#
 ax.set_xticks(0:length(xs)-1,labels=xlabeltextarr,rotation=45,ha="right",fontsize=15)
 ax.set_yticks(0:length(ys)-1,labels=ylabeltextarr,fontsize=15)
 fig.align_ylabels()
 fig.tight_layout()
-fig.savefig("figs/correlation_heatmap_$(y_type).pdf",bbox_inches="tight")
-fig.savefig("figs/correlation_heatmap_$(y_type).png",bbox_inches="tight")
+fig.savefig("figs/correlations/correlation_heatmap_$(y_type).pdf",bbox_inches="tight")
+fig.savefig("figs/correlations/correlation_heatmap_$(y_type).png",bbox_inches="tight")

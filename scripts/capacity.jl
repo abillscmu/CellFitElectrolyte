@@ -7,8 +7,11 @@ cap_data_dict = Dict()
 
 cells = [cell for cell in keys(ex_data_dict["cells"])]
 for (i,cell) in enumerate(cells)
+    if cell == "VAH11"
+        continue
+    end
     fig,ax = subplots()
-    d = load("results/capacities/$(cell)_relaxation.jld2")
+    d = load("results/relaxation/$(cell)_relaxation.jld2")
     caps = d[cell]
 
     println(cell)
@@ -51,7 +54,7 @@ ax.scatter(cap_data_dict[cell]["cycle"],cap_data_dict[cell]["capacity"],label="R
 ax.set_xlabel("Cycle")
 ax.set_ylabel("Capacity [Ah]")
 ax.legend()
-fig.savefig("figs/si/capacities/$(cell).pdf")
+fig.savefig("figs/new_relaxation/$(cell).pdf")
 
 end
 

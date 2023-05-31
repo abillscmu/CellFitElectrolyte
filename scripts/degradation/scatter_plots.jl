@@ -2,7 +2,7 @@ using PythonPlot, Statistics, PythonCall
 
 
 xs = ["Max Temperature", "Max DOD", "Max Current", "Cycle Life","Mean Temperature", "Min Current"]
-ys = ["Max Temperature", "Max DOD", "Max Current", "Cycle Life","Mean Temperature", "Min Current"]
+ys = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
 
 labeldict = Dict(
     "Max Temperature" => "Max Temperature [K]",
@@ -81,14 +81,14 @@ for (j,x) in enumerate(xs)
         else
             error("y not found")
         end
-        if i == j
+        if false
             axes[i-1,j-1].hist(x_axis)
             if i != 1
                 axes[i-1,j-1].set_xticks(pylist())
                 axes[i-1,j-1].set_xlim(axes[i-2,j-1].get_xlim())
             end
             axes[i-1,j-1].set_yticks(pylist())
-        elseif i<j
+        elseif true
             axes[i-1,j-1].scatter(x_axis,y_axis,s=10)
             axes[i-1,j-1].xaxis.set_visible(false)
             axes[i-1,j-1].yaxis.set_visible(false)
@@ -134,5 +134,5 @@ for (j,x) in enumerate(xs)
     #fig.tight_layout()
 end
 fig.set_figwidth(8)
-fig.savefig("figs/correlation_xalone.pdf",bbox_inches="tight")
-fig.savefig("figs/correlation_xalone.png",bbox_inches="tight")
+#fig.savefig("figs/correlation_xalone.pdf",bbox_inches="tight")
+#fig.savefig("figs/correlation_xalone.png",bbox_inches="tight")

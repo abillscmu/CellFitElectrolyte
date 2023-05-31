@@ -2,13 +2,13 @@ using CellFitElectrolyte, JLD2, PythonPlot, Turing, KernelDensity, PythonCall
 np = pyimport("numpy")
 pygui(true)
 
-FOLDERNAME = "results/newnuts_5/"
-CELL = "VAH01"
-SYMBOL = :εₑ⁻
+FOLDERNAME = "results/0302/"
+CELL = "VAH11"
+SYMBOL = :ω
 
 val = []
 cyc = []
-
+weird = []
 figure(1)
 clf()
 
@@ -19,8 +19,12 @@ for cell in 0:2500
     chain = try
         d = load(cell_to_load)
         chain = d["chain"]
-        append!(val, chain[SYMBOL].data[:,1])
-        append!(cyc, cell*ones(1000))
+        if length(chain[SYMBOL].data[:,1]) != 1000
+            append!(weird, cell)
+        else
+            append!(val, chain[SYMBOL].data[:,1])
+            append!(cyc, cell*ones(1000))
+        end     
     catch
         @warn "problem with $cell"
         continue
@@ -29,7 +33,7 @@ end
 
 figure(1)
 clf()
-hist2D(cyc, val, bins=100, vmin=0.0, vmax=400.0)
+hist2D(cyc, val, bins=100)
 colorbar(label="Density")
 grid(alpha=0.8)
 xlabel("Cycle Number")

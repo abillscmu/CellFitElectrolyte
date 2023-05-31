@@ -7,7 +7,7 @@ T(z,N) = sqrt(4N+10)*z/(3*sqrt(N-1))
 
 sym = :ω
 cells = unique([split(f,"_")[1] for f in readdir("results/outputs0117_elec/")])
-cells=["VAH01"]
+#cells=["VAH01"]
 for cell in cells
 max_cycle = maximum(data_dict[cell]["cycles"])
 num_cycs = length(data_dict[cell]["cycles"])
@@ -69,7 +69,7 @@ total_cycs = []
     xlabel("Cycles Seen",fontsize=16)
     ylabel("Mann-Kendall Z Score",fontsize=16)
     grid()
-    savefig("figs/$(cell)_zscore.png",bbox_inches="tight")
-    savefig("figs/$(cell)_zscore.pdf",bbox_inches="tight")
+    savefig("figs/mk/$(cell)_zscore.png",bbox_inches="tight")
+    savefig("figs/mk/$(cell)_zscore.pdf",bbox_inches="tight")
     #fig.savefig("$cell.png")
 end

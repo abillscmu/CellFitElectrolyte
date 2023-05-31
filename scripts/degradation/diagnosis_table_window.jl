@@ -78,7 +78,7 @@ total_cycs = []
     xlabel("Cycles Seen")
     ylabel("Fraction of Indications")
     grid()
-    savefig("figs/$(cell)_diagnosis.png",bbox_inches="tight")
-    savefig("figs/$(cell)_diagnosis.pdf",bbox_inches="tight")
+    savefig("figs/diagnosis/$(cell)_diagnosis.png",bbox_inches="tight")
+    savefig("figs/diagnosis/$(cell)_diagnosis.pdf",bbox_inches="tight")
     #fig.savefig("$cell.png")
 end
