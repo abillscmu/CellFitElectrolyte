@@ -3,7 +3,7 @@ deg_df = CSV.read("data/degstuff.csv",DataFrame)
 #pygui(true)
 pymannkendall = pyimport("pymannkendall")
 mpl = PythonPlot.matplotlib
-T(z,N) = sqrt(4N+10)*z/(3*sqrt(N-1))
+TF(z,N) = sqrt(4N+10)*z/(3*sqrt(N-1))
 
 sym = :ω
 cells = unique([split(f,"_")[1] for f in readdir("results/outputs0117_elec/")])
@@ -88,8 +88,8 @@ total_cycs = []
     ax[-1].axes.get_xaxis().set_visible(true)
     ax[-1].tick_params(labelsize=16)
     #fig.tight_layout()
-    savefig("figs/diagnosis/$(cell)_diagnosis.png",bbox_inches="tight")
-    savefig("figs/diagnosis/$(cell)_diagnosis.pdf",bbox_inches="tight")
+    fig.savefig("figs/diagnosis/$(cell)_diagnosis.png",bbox_inches="tight")
+    fig.savefig("figs/diagnosis/$(cell)_diagnosis.pdf",bbox_inches="tight")
     #fig.savefig("$cell.png")
     celldict[cell] = diagnoses
 end

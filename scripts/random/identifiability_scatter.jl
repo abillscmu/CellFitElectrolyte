@@ -1,4 +1,5 @@
 using PythonPlot, Statistics, PythonCall, KernelDensity
+np = pyimport("numpy")
 
 
 SYMBOLS = SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
@@ -10,6 +11,7 @@ nrow = length(ys)
 ncol = length(xs)
 
 
+cells = keys(data_dict)
 for CELL in cells
 println(CELL)
 
@@ -21,6 +23,12 @@ end
 high = maximum(data_dict[CELL]["cycles"])
 
 cycles = [low, mid, high]
+range  = high - low
+min_cell = -range
+max_cell = range*1.25
+norm = PythonPlot.matplotlib.colors.Normalize(vmin = min_cell, vmax=max_cell)
+cmap = PythonPlot.matplotlib.cm.get_cmap("Blues")
+mycolors = [cmap(norm(low)), cmap(norm(mid)), cmap(norm(high))]
 
 
 x_type = "absolute"
@@ -57,8 +65,8 @@ for (j,x) in enumerate(xs)
                 y_axis = data_dict[CELL]["distributions"][CYCLE][y].data
                 x_axis = data_dict[CELL]["distributions"][CYCLE][x].data
                 U = kde(x_axis)
-                ax[i-1,j-1].fill_between(x=U.x,y1=U.density,alpha=0.5)
-                ax[i-1,j-1].plot(U.x,U.density)
+                ax[i-1,j-1].fill_between(x=U.x,y1=U.density,alpha=0.5, color=cmap(norm(CYCLE)))
+                ax[i-1,j-1].plot(U.x,U.density, color=cmap(norm(CYCLE)))
             end
         elseif i>j
             cs = zeros(3)
@@ -68,7 +76,7 @@ for (j,x) in enumerate(xs)
                 cs[k] = round(cor(x_axis, y_axis),digits=3)
             end
             textArr = [pylist(string.([cycles[k],cs[k]])) for k in 1:length(cycles)]
-            textColour = pylist([pylist(repeat(["tab:$(mycolors[k])"],2)) for k in 1:length(cycles)])
+            textColour = pylist([pylist(repeat([mycolors[k]],2)) for k in 1:length(cycles)])
             textArr = pylist(textArr)
             colLabels = pylist(["Cycle","ρ"])
             mytab = ax[i-1,j-1].table(cellText=textArr,cellColours=textColour, loc="center",colLabels=colLabels)
@@ -88,7 +96,7 @@ for (j,x) in enumerate(xs)
             for (k,CYCLE) in enumerate(cycles)
                 y_axis = data_dict[CELL]["distributions"][CYCLE][y].data
                 x_axis = data_dict[CELL]["distributions"][CYCLE][x].data
-                ax[i-1,j-1].scatter(x_axis,y_axis,s=0.5)
+                ax[i-1,j-1].scatter(x_axis,y_axis,s=0.5, c=CYCLE*ones(length(x_axis)),cmap="Blues", vmax=max_cell, vmin=min_cell)
             end
         end
 
@@ -212,6 +220,16 @@ for (j,x) in enumerate(xs)
     end
     #fig.tight_layout()
 end
+
+norm = PythonPlot.matplotlib.colors.Normalize(vmin=min_cell,vmax=max_cell)
+cmap = PythonPlot.matplotlib.pyplot.get_cmap("Blues")
+sm = PythonPlot.matplotlib.pyplot.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array(np.array([0.0]))
+fig.subplots_adjust(right=0.85)
+cbar_ax = fig.add_axes([0.925, 0.15, 0.025, 0.7])
+
+cb = fig.colorbar(sm, cax=cbar_ax,ticks=[cycles[1],cycles[3]-10],boundaries=np.arange(0,cycles[3]))
+cb.ax.set_yticklabels(["Early\nLife ", "Late\nLife"], fontsize=14)
 fig.savefig("figs/identifiability/$(CELL)_identifiability.png",bbox_inches="tight")
 fig.savefig("figs/identifiability/$(CELL)_identifiability.pdf",bbox_inches="tight")
 end

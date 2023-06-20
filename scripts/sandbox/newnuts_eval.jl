@@ -13,6 +13,7 @@ using ProgressMeter
 using LinearAlgebra
 using Statistics
 using JLD2
+using PythonPlot
 
 using Random
 Random.seed!(14)
@@ -22,7 +23,10 @@ cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 
-VAH = "VAH16_381"
+VAHs = ["VAH01_2", "VAH01_200", "VAH01_400", "VAH01_601", "VAH01_845"]
+
+fig, axes = subplots(1,5, figsize=(8,2))
+for (j,VAH) in enumerate(VAHs)
 split1 = split(VAH,['H','_'])
 cell = parse(Int,split1[2])
 cycle = parse(Int,split1[3])
@@ -215,15 +219,23 @@ N = length(chain)
 using PythonPlot
 c = chain_to_nt(chain,1)
 predicted = fit_cfe(interpolated_voltage,c)
-fig, ax = subplots()
-ax.plot(interpolated_time[1:end-1], predicted, color="tab:grey", label = "Model")
+#fig, ax = subplots()
+axes[j-1].plot(interpolated_time[1:end-1], predicted, color="tab:grey", label = "Model")
 @showprogress for i =2:N
     c = chain_to_nt(chain,i)
     predicted = fit_cfe(interpolated_voltage,c)
-    ax.plot(interpolated_time[1:end-1], predicted, color="tab:grey")
+    axes[j-1].plot(interpolated_time[1:end-1], predicted, color="tab:grey")
 end
-ax.plot(interpolated_time, interpolated_voltage, color="tab:blue", label = "Experiment")
-ax.set_xlabel("Time [s]")
-ax.set_ylabel("Voltage [V]")
-ax.grid()
-ax.legend()
+axes[j-1].plot(interpolated_time, interpolated_voltage, color="tab:blue", label = "Experiment")
+axes[j-1].set_xlabel("Time [s]")
+axes[j-1].set_ylabel("Voltage [V]")
+axes[j-1].grid()
+axes[j-1].set_ylim([2.4, 4.25])
+cynum = parse(Int, split(VAH,'_')[2])
+axes[j-1].set_title("Cycle $cynum")
+#axes[j-1].legend()
+end
+fig.tight_layout()
+axes[-1].legend(loc="center left", bbox_to_anchor=(1, 0.5))
+fig.savefig("figs/real/acs_voltage_traj_top.pdf", bbox_inches="tight")
+

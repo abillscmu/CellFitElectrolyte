@@ -101,19 +101,21 @@ for (j,x) in enumerate(xs)
     #fig.tight_layout()
 end
 
-fig, ax = subplots(figsize=(8,6.4))
+fig, ax = subplots(figsize=(5,5))
 cmap = PythonPlot.matplotlib.colormaps["PRGn"]
-pcm = ax.imshow(Z,aspect="auto", cmap=cmap)
-colorbar(pcm, ax=ax)
-#=
+pcm = ax.imshow(Z,aspect="auto", cmap=cmap, vmin=-1, vmax=1)
+cbar = fig.colorbar(pcm, ax=ax, ticks = [-1, 0, 1], orientation="horizontal", location="top")
+cbar.ax.set_xticklabels(["Negative\nCorrelation", "No\nCorrelation", "Positive\nCorrelation"], fontsize=14)
+
+
 for i in 1:nrow
     for j in 1:ncol
-        text(j-1, i-1, Z[i, j], ha="center", va="center", color="w",fontsize=13)
+        text(j-1, i-1, Z[i, j], ha="center", va="center", color="k",fontsize=11)
     end
 end
-=#
-ax.set_xticks(0:length(xs)-1,labels=xlabeltextarr,rotation=45,ha="right",fontsize=15)
-ax.set_yticks(0:length(ys)-1,labels=ylabeltextarr,fontsize=15)
+
+ax.set_xticks(0:length(xs)-1,labels=xlabeltextarr,rotation=60,ha="right",fontsize=14, rotation_mode="anchor")
+ax.set_yticks(0:length(ys)-1,labels=ylabeltextarr,fontsize=14)
 fig.align_ylabels()
 fig.tight_layout()
 fig.savefig("figs/correlations/correlation_heatmap_$(y_type).pdf",bbox_inches="tight")

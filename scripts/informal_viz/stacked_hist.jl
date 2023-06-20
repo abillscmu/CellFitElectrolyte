@@ -1,7 +1,7 @@
 using JLD2, PythonPlot, PythonCall, LinearAlgebra, Statistics
 np = pyimport("numpy")
 
-individual = true
+individual = false
 recompute = true
 plot_med_cycle = true
 
