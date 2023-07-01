@@ -19,6 +19,7 @@ using KernelDensity
 using KDEDistributions
 using Turing
 using PythonPlot
+using Optim
 
 #set up simulation
 cache = CellFitElectrolyte.initialize_cache(Float64)
@@ -115,8 +116,8 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance)
 end
 
 @model function turing_life_fit(distribution_dict, cycle_array_vec, p, lifetime_evaluator, ω_data)
-    ω = rand(distribution_dict[:ω]["Initial"])
-    k_resistance ~ truncated(Normal(1e-10, 1e-10), 0, 1e-9)
+    ω = mean(distribution_dict[:ω]["Initial"].data)
+    k_resistance ~ Normal(0, 1e-9)
     u_top = vcat(ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
     u_bot = zeros(typeof(k_resistance), 8)
     p_phys = p.p_phys
@@ -165,6 +166,6 @@ model = turing_life_fit(distribution_dict, cycle_array_vec, p, lifetime_evaluato
 
 
 
-chain = sample(model, MH(), MCMCSerial(), 1000, 1; progress=true)
+opt = optimize(model, MLE(), SimulatedAnnealing())
 
 
