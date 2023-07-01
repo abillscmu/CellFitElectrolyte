@@ -129,13 +129,13 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
             success = CellFitElectrolyte.simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
-                return zeros(size(integrator.u), length(saves))
+                return 0
             end
         else
             success = CellFitElectrolyte.simulate_normal_cycle!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv, num_steps)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
-                return zeros(size(integrator.u), length(saves))
+                return 0
             end
         end
         if i in saves
@@ -150,7 +150,7 @@ end
     k_resistance = 1.5e-9
 
 
-    k_sei ~ Uniform(0, 5e-8)
+    k_sei ~ Uniform(0, 1e-7)
     E_sei ~ Uniform(0, 1)
 
 
@@ -195,7 +195,12 @@ end
         sol = try 
             sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, k_resistance, saves, k_sei, E_sei)
         catch
-            sol = zeros(length(u), length(saves))
+            @info "Solver errored"
+            sol = 0
+        end
+        if sol == 0
+            Turing.@addlogprob! -Inf
+            return nothing
         end
         ω_end = sol[12,end]
         println("ending frac: $ω_end")
@@ -304,7 +309,7 @@ for k in keys(distribution_dict["VAH02"])
 end
 
 
-plot(vcat(1, fitting_cycles["VAH05"]), my_sol["VAH05"][:frac_sol_am_neg][1], color="tab:orange")
+plot(vcat(1, fitting_cycles["VAH05"]), my_sol["VAH05"][:frac_sol_am_neg][1], color="tab:green")
 for k in keys(distribution_dict["VAH05"])
     if k == 620
         continue
@@ -312,6 +317,6 @@ for k in keys(distribution_dict["VAH05"])
     println(k)
     x = zeros(1000) .+ k .+ rand(1000)
     y = distribution_dict["VAH05"][k][:frac_sol_am_neg]
-    scatter(x,y,s=2,c="tab:orange")
+    scatter(x,y,s=2,c="tab:green")
 end
 
