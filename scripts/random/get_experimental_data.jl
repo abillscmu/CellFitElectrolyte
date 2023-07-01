@@ -25,7 +25,7 @@ ex_data_dict = Dict(
     max_current = maximum(-df.ImA./1000)
     min_current = minimum(-df.ImA./1000)
 
-    mean_voltage = mean(-df.EcellV./1000)
+    mean_voltage = mean(df.EcellV)
     max_voltage = maximum(df.EcellV)
     min_voltage = minimum(df.EcellV)
 

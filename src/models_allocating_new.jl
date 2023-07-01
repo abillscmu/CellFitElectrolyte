@@ -83,7 +83,7 @@ function equations_electrolyte_allocating_new(du,u,p,t,cache,cellgeometry,cathod
     return nothing
 end
 
-function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCircuitVoltage, anodeocv, Iapp)
+function calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCircuitVoltage, anodeocv, Iapp)
 
     cₛˢ⁻ = u[1]
     cₛᵇ⁻ = u[2]
@@ -92,6 +92,19 @@ function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCir
     cₑ⁺ = u[5]
     cₛᵇ⁺ = u[6]
     cₛˢ⁺ = u[7]
+
+    ω = u[9]
+    εₑ⁻ = u[10]
+    εₑ⁺ = u[11]
+    frac_sol_am_neg = u[12]
+    frac_sol_am_pos = u[13]
+
+    Temp = u[14] 
+    
+    εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
+    εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
+    εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
+    εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
 
     #Transport Parameters
@@ -106,9 +119,7 @@ function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCir
     #Geometry
     @unpack R⁺,R⁻= p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,εₑˢ,Temp = p
-    @unpack ω = p
-    @unpack εᵧ⁺,εᵧ⁻ = p
+    @unpack εₑˢ = p
 
     εₑ⁻ = 1-εₛ⁻-εᵧ⁻
     εₑ⁺ = 1-εₛ⁺-εᵧ⁺
@@ -141,7 +152,7 @@ function calc_voltage_new( u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCir
     ηₛ = sei_ohmic(ω,Iapp)
     #Thermal Equations
     V = U⁺-U⁻+η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ
-    return V
+    return V, U⁺, U⁻
 end
 
 
@@ -161,12 +172,21 @@ end
 
 
 
-function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
+function equations_electrolyte_allocating_new_withvoltage!(du,u,p,t,cache,cellgeometry,cathodeocv,anodeocv)
     cₛˢ⁻,cₛᵇ⁻,cₑ⁻,cₑˢ,cₑ⁺,cₛᵇ⁺,cₛˢ⁺ = @view u[1:7]
-    @unpack Temp = p
+    Temp = u[14]
     @unpack input_type,input_value = p
     Iapp = u[8]
-
+    
+    ω = u[9]
+    εₑ⁻ = u[10]
+    εₑ⁺ = u[11]
+    frac_sol_am_neg = u[12]
+    frac_sol_am_pos = u[13]
+    εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
+    εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
+    εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
+    εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
 
     #Transport Parameters
     @unpack θₛ⁻,θₑ,θₛ⁺ = p
@@ -182,8 +202,7 @@ function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeo
     #Geometry
     @unpack R⁺,R⁻ = p
     @unpack Vₛ⁻,Vₛ⁺,T⁺,T⁻  = cellgeometry
-    @unpack εₛ⁻,εₛ⁺,εₑˢ = p
-    @unpack εᵧ⁺,εᵧ⁻ = p
+    @unpack εₑˢ = p
     εₑ⁻ = 1-εₛ⁻-εᵧ⁻
     εₑ⁺ = 1-εₛ⁺-εᵧ⁺
 
@@ -224,14 +243,14 @@ function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeo
     du_transport = du_transport .* mm
     du[1:7] = du_transport + cache_control
 
+    Voltage, U⁺, U⁻ = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
+
 
     if input_type==0
         du[8] = Iapp-0
     elseif input_type==1
-        Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
         du[8] = input_value-(Iapp*Voltage)
     elseif input_type==2
-        Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
         du[8] = input_value-Voltage 
     elseif input_type==3
         du[8] = Iapp-input_value;
@@ -242,7 +261,6 @@ function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeo
             if p.cccv_switch_2 == true
                 du[8] = Iapp - 0
             else
-                Voltage = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
                 du[8] = Voltage - p.vfull
             end
         else
@@ -252,6 +270,17 @@ function equations_electrolyte_allocating_new_withvoltage(du,u,p,t,cache,cellgeo
         @warn "condition not recognized"
         du[8] = Iapp-0
     end
+    return Voltage, U⁺, U⁻
+end
+
+
+function thermal_model(du, u, p_thermal, Voltage, OCV)
+    @unpack C, ha, hb, T_amb = p_thermal
+    T = u[14]
+    h = ha*(T - T_amb) + hb
+    Iapp = u[8]
+    Q = Iapp*(OCV - Voltage)
+    du[14] = (Q - h*(T - T_amb))/C
     return nothing
 end
 

@@ -1,6 +1,6 @@
 using JLD2, Turing, CellFitElectrolyte, KDEDistributions, KernelDensity, CellFitElectrolyte.OCV
 
-FOLDERNAME = "results/newnuts_5/"
+FOLDERNAME = "results/0302/"
 
 cellgeometry = CellFitElectrolyte.cell_geometry()
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
@@ -32,11 +32,13 @@ for file in readdir(FOLDERNAME)
             data_dict[vah] = Dict(
                 "cycles" => [cycle_num,],
                 "distributions" => Dict(),
-                "mean" => Dict()
+                "mean" => Dict(),
+                "time" => Dict()
             )
         end
         data_dict[vah]["distributions"][cycle_num] = Dict()
         data_dict[vah]["mean"][cycle_num] = Dict()
+        data_dict[vah]["time"][cycle_num] = (chain.info.stop_time - chain.info.start_time)./3600
         for sym in predicted_states
             if !(sym in derived_states)
                 distribution_data = chain[sym].data[:,1]

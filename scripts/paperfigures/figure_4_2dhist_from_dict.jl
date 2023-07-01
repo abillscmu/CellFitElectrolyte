@@ -6,7 +6,8 @@ PythonPlot.matplotlib.rcParams["font.size"] = 10
 
 
 FOLDERNAME = "results/outputs0117_elec/"
-CELLS = ["VAH07","VAH09","VAH10","VAH11","VAH13","VAH15","VAH16","VAH17","VAH20","VAH22","VAH23","VAH24","VAH25","VAH26","VAH27","VAH28"]
+CELLS = ["VAH01", "VAH02", "VAH05", "VAH06", "VAH12", "VAH30"]
+#CELLS = ["VAH01", "VAH02"]
 SYMBOLS = SYMBOLS = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_pos, :frac_sol_am_neg, :n_li, :εₛ⁻, :εₛ⁺]
 num_rows = length(SYMBOLS)
 num_cols = length(CELLS)
@@ -17,7 +18,7 @@ ylimits = Dict(
     :εₑ⁺ => pylist([0.05, 0.5]),
     :frac_sol_am_pos => pylist([0.5,1.0]),
     :frac_sol_am_neg => pylist([0.5,1.0]),
-    :n_li => pylist([0.13, 0.22]),
+    :n_li => pylist([0.05, 0.2  ]),
     :εₛ⁺ => pylist([0.25, 0.95]),
     :εₛ⁻ => pylist([0.25, 0.95])
 )
@@ -33,7 +34,7 @@ ylabels = Dict(
 )
 
 
-fig, axes = subplots(nrows=num_rows, ncols=num_cols, figsize=(8.5,8.5))
+fig, axes = subplots(nrows=num_rows, ncols=num_cols, figsize=(8.5,6))
 fig.subplots_adjust(hspace=0.05, wspace=0.05)
 
   
@@ -49,15 +50,19 @@ for (j,CELL) in enumerate(CELLS)
         for cell in 0:2500
         try
             data = data_dict[CELL]["distributions"][cell][SYMBOL].data
-            append!(val, data)
-            append!(cyc, cell*ones(1000))
+            if length(data) != 1000
+                continue
+            else
+                append!(val, data)
+                append!(cyc, cell.*ones(1000))
+            end  
         catch
             @warn "problem with $cell"
             continue
         end
     end
 
-    axes[i-1,j-1].hist2d(cyc, val, bins=100, range=pylist([xlimit_thiscell, ylimit_thissym]))
+    axes[i-1,j-1].hexbin(cyc, val, gridsize=100, extent=pytuple((xlimit_thiscell[0], xlimit_thiscell[1], ylimit_thissym[0], ylimit_thissym[1])), mincnt = 10)
     #colorbar(label="Density")
     #grid(0.2)
     if i == num_rows
@@ -85,7 +90,7 @@ for (j,CELL) in enumerate(CELLS)
         axes[i-1,j-1].set_xlim(axes[i-2,j-1].get_xlim())
     end
     if i == 1
-        axes[i-1,j-1].set_title(CELL,rotation=-45,rotation_mode="anchor",ha="right")
+        axes[i-1,j-1].set_title(CELL)#,rotation=-45,rotation_mode="anchor",ha="right")
     end
     if j == 1
         axes[i-1,j-1].set_ylabel(yname)
@@ -112,5 +117,14 @@ for (j,CELL) in enumerate(CELLS)
 end
 end 
 #tight_layout()
-savefig("figs/si/2dhist_final.png", bbox_inches="tight")
-savefig("figs/si/2dhist_final.pdf", bbox_inches="tight")
+norm = PythonPlot.matplotlib.colors.Normalize(vmin=0,vmax=2)
+cmap = PythonPlot.matplotlib.pyplot.get_cmap("viridis")
+sm = PythonPlot.matplotlib.pyplot.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array(np.array([0.0]))
+fig.subplots_adjust(right=0.9)
+cbar_ax = fig.add_axes([0.95, 0.15, 0.05, 0.7])
+
+cb = fig.colorbar(sm, cax=cbar_ax,ticks=[0,1,2],boundaries=np.arange(-0.05,2.1,.1))
+cb.ax.set_yticklabels(["Low\nDensity", "Medium\nDensity", "High\nDensity"], fontsize=10)
+savefig("figs/real/2dhist_supp.png", bbox_inches="tight")
+savefig("figs/real/2dhist_supp.pdf", bbox_inches="tight")
