@@ -1,4 +1,4 @@
-using DataFrames, CSV, PythonPlot
+using DataFrames, CSV, PythonPlot, Turing, JLD2, ProgressMeter
 
 files = readdir("results/0302/")
 x = map( s -> s[1:5], files) 
@@ -114,6 +114,30 @@ for cell in cells
             arr[i] = 1546
             a = 1546
         end
+        if (cell == "VAH07") & (a == 275)
+            arr[i] = 273
+            a = 273
+        end
+        if (cell == "VAH13") & (a == 810)
+            arr[i] = 809
+            a = 809
+        end
+        if (cell == "VAH16") & (a == 494)
+            arr[i] = 485
+            a = 485
+        end
+        if (cell == "VAH25") & (a == 432)
+            arr[i] = 430
+            a = 430
+        end
+        if (cell == "VAH25") & (a == 493)
+            arr[i] = 492
+            a = 492
+        end
+        if (cell == "VAH26") & (a == 1161)
+            arr[i] = 1158
+            a = 1158
+        end
         if !(successarr[i])
             continue
         end
@@ -138,6 +162,25 @@ for cell in cells
 
     files_to_use[cell] = arr
 end
+
+params = (:ω, :εₑ⁺, :εₑ⁻, :frac_sol_am_neg, :frac_sol_am_pos)
+@showprogress for cell in keys(files_to_use)
+    if cell in ["VAH01", "VAH02", "VAH05", "VAH06", "VAH07", "VAH09", "VAH10", "VAH11", "VAH12"]
+        continue
+    end
+    for p in params
+        fig, ax = subplots()
+        for c in files_to_use[cell]
+            d = load("results/0302/$(cell)_$(c)_HMC.jld2")
+            chain = d["chain"]
+            datas = chain[p].data[:,1]
+            ax.scatter(c*ones(1000), datas)
+        end
+        fig.savefig("chain_plots/$(cell)_$(p).pdf", bbox_inches = "tight")
+    end
+end
+
+
 
 @save "files_to_use.jld2" files_to_use
 

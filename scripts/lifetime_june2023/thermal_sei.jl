@@ -32,7 +32,7 @@ cellgeometry = CellFitElectrolyte.cell_geometry()
 
 @load "files_to_use.jld2"
 cells_to_use = ("VAH01", "VAH02", "VAH05")
-
+#cells_to_use = ("VAH01",)
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
 
 
@@ -150,7 +150,7 @@ end
     k_resistance = 1.5e-9
 
 
-    k_sei ~ Uniform(0, 1e-7)
+    k_sei ~ Uniform(0, 5e-6)
     E_sei ~ Uniform(0, 1)
 
 

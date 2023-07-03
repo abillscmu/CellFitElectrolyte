@@ -57,7 +57,7 @@ function simulate_normal_cycle!(integrator, cycle_array, cache, cellgeometry, ca
             OrdinaryDiffEq.set_u!(integrator, u)
         elseif input_type == 1.0
             u = copy(integrator.u)
-            Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+            Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
             u[8] = input_value/Voltage
             OrdinaryDiffEq.set_u!(integrator, u)
         end
@@ -76,7 +76,7 @@ function simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv,
     input_type = 3.0
     input_value = cycle_array[2]
     @pack! integrator.p.p_phys = input_type, input_value
-    Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+    Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
     u = copy(integrator.u)
     u[8] = input_value
     OrdinaryDiffEq.set_u!(integrator, u)
@@ -85,7 +85,7 @@ function simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv,
         if integrator.sol.retcode != :Default
             error("integrator failed")
         end
-        Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+        Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
     end
     input_type = 0.0
     input_value = 0.0
@@ -97,18 +97,18 @@ function simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv,
         if integrator.sol.retcode != :Default
             return error("integrator failed")
         end
-        Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+        Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
     end
     input_type = 5.0
     input_value = cycle_array[3]
     @pack! integrator.p.p_phys = input_type, input_value
     u = copy(integrator.u)
     u[8] = input_value
-    Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p.p_phys,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+    Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,integrator.p.p_phys,integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
     OrdinaryDiffEq.set_u!(integrator, u)
     while integrator.u[8] < -0.01
         step!(integrator)
-        Voltage, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
+        Voltage, _, _, _, _ = CellFitElectrolyte.calc_voltage_new(integrator.u,@view(integrator.p[:p_phys]),integrator.t,cache,cellgeometry,cathodeocv,anodeocv,integrator.u[8])
         if integrator.sol.retcode != :Default
             error("integrator failed")
         end

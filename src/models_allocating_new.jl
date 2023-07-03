@@ -152,7 +152,7 @@ function calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv::OCV.OpenCirc
     ηₛ = sei_ohmic(ω,Iapp)
     #Thermal Equations
     V = U⁺-U⁻+η₊-η₋-ηc₋-ηc₊-ηₒ₋-ηₒ₊-ηₛ
-    return V, U⁺, U⁻
+    return V, U⁺, U⁻, η₊, η₋
 end
 
 
@@ -243,7 +243,7 @@ function equations_electrolyte_allocating_new_withvoltage!(du,u,p,t,cache,cellge
     du_transport = du_transport .* mm
     du[1:7] = du_transport + cache_control
 
-    Voltage, U⁺, U⁻ = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
+    Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.calc_voltage_new(u, p, t, cache, cellgeometry, cathodeocv, anodeocv, Iapp)
 
 
     if input_type==0
