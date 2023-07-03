@@ -104,10 +104,10 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
     println((k_sei, E_sei))
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
-        Voltage, U⁺, U⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
+        Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
         du[9:end] .= 0
         du[9] = k_resistance
-        j_sei = CellFitElectrolyte.sei_kinetic(k_sei, u[14], U⁻, E_sei)
+        j_sei = CellFitElectrolyte.sei_kinetic(k_sei, u[14], U⁻ + η⁻ + 0.4, E_sei)
         du[12] = - j_sei
         # Thermal model
         OCV = U⁺ - U⁻
@@ -288,6 +288,9 @@ my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
 
 cell_to_plot = "VAH01"
 
+@save "thermal_sei.jld2" my_sol distribution_dict fitting_cycles
+
+#=
 figure(1)
 clf()
 plot(vcat(1, fitting_cycles["VAH01"]), my_sol["VAH01"][:frac_sol_am_neg][1])
@@ -319,4 +322,4 @@ for k in keys(distribution_dict["VAH05"])
     y = distribution_dict["VAH05"][k][:frac_sol_am_neg]
     scatter(x,y,s=2,c="tab:green")
 end
-
+=#

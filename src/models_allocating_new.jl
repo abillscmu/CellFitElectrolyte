@@ -270,7 +270,7 @@ function equations_electrolyte_allocating_new_withvoltage!(du,u,p,t,cache,cellge
         @warn "condition not recognized"
         du[8] = Iapp-0
     end
-    return Voltage, U⁺, U⁻
+    return Voltage, U⁺, U⁻, η⁺, η⁻
 end
 
 
