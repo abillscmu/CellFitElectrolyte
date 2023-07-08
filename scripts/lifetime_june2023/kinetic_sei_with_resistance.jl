@@ -291,4 +291,4 @@ my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
 
 cell_to_plot = "VAH01"
 
-@save "thermal_sei.jld2" my_sol distribution_dict fitting_cycles opt
+@save "thermal_sei_with_resistance.jld2" my_sol distribution_dict fitting_cycles opt
