@@ -31,7 +31,7 @@ vfull = initialcond["Starting Voltage[V]"]
 cellgeometry = CellFitElectrolyte.cell_geometry()
 
 @load "files_to_use.jld2"
-cells_to_use = ("VAH01", "VAH02", "VAH05")
+cells_to_use = ("VAH01", "VAH02", "VAH05", "VAH06", "VAH09", "VAH10")
 #cells_to_use = ("VAH01",)
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
 
@@ -288,7 +288,7 @@ my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
 
 cell_to_plot = "VAH01"
 
-@save "thermal_sei.jld2" my_sol distribution_dict fitting_cycles
+@save "thermal_sei.jld2" my_sol distribution_dict fitting_cycles opt
 
 #=
 figure(1)
