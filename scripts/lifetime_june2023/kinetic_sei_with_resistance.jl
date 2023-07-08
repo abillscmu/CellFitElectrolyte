@@ -32,7 +32,7 @@ cellgeometry = CellFitElectrolyte.cell_geometry()
 
 @load "files_to_use.jld2"
 cells_to_use = ("VAH01", "VAH02", "VAH05", "VAH06", "VAH09", "VAH10")
-cells_to_use = ("VAH01",)
+#cells_to_use = ("VAH01",)
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
 
 
@@ -45,7 +45,7 @@ param_to_idx = Dict(
     :frac_sol_am_pos=>13
 )
 
-params = (:frac_sol_am_neg,)
+params = (:ω, :frac_sol_am_neg)
 
 function chainoperator(chain, param, operator)
     return operator(chain[param].data[:,1])
@@ -101,13 +101,13 @@ cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vect
 
 function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E_sei)
     #Create Function (with neural network)
-    println((k_sei, E_sei))
+    println((k_sei, E_sei, k_resistance))
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
         Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
         du[9:end] .= 0
-        du[9] = k_resistance
         j_sei = CellFitElectrolyte.sei_kinetic(k_sei, u[14], U⁻ + η⁻ + 0.4, E_sei)
+        du[9] = k_resistance * j_sei
         du[12] = - j_sei
         # Thermal model
         OCV = U⁺ - U⁻
@@ -147,9 +147,8 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
 end
 
 @model function turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
-    k_resistance = 1.5e-9
-
-
+    k_resistance_exponent ~ Uniform(-3, 3)
+    k_resistance = 1*10. ^k_resistance_exponent
     k_sei ~ Uniform(0, 5e-6)
     E_sei ~ Uniform(0, 1)
 
@@ -209,7 +208,8 @@ end
             logprob = log(MultiKDE.pdf(distribution_dict[vah][cycle]["kde"], ending_vals))
             if (logprob == -Inf) & (i > 1)
                 println("Became unfeasible at step $i")
-                break
+                println("Ending vals: $(ending_vals)")
+                Turing.@addlogprob! -1000
             else
                 println("Log probability of step $i $logprob")
                 Turing.@addlogprob! logprob
@@ -225,13 +225,9 @@ model = turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, 
 opt = optimize(model, MAP(), NelderMead())
 
 
-function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei)
-    fitting_cycles
-    k_resistance = 1.5e-9
+function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei, k_resistance_exponent)
 
-
-    #k_sei ~ Uniform(0, 5e-8)
-    #E_sei ~ Uniform(0, 1)
+    k_resistance = 1*10. ^ k_resistance_exponent
     sol_dict = Dict()
 
 
