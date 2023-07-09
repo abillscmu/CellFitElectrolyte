@@ -4,9 +4,9 @@
 #SBATCH -p cpu
 #SBATCH -A venkvis
 #SBATCH -J 🎲🔋SEI
-#SBATCH -o thermal_sei_with_resistance.out
-#SBATCH -e thermal_sei_with_resistance.err
-#SBATCH -t 0-04:00
+#SBATCH -o thermal_sei_with_resistance_2.out
+#SBATCH -e thermal_sei_with_resistance_2.err
+#SBATCH -t 0-12:00
 #SBATCH --mem 16G
 
 

@@ -286,9 +286,10 @@ end
 
 k_sei = opt.values[1]
 E_sei = opt.values[2]
+k_resistance_exponent = opt.values[3]
 
-my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei)
+my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei, k_resistance_exponent)
 
 cell_to_plot = "VAH01"
 
-@save "thermal_sei_with_resistance.jld2" my_sol distribution_dict fitting_cycles opt
+@save "thermal_sei_with_resistance_2.jld2" my_sol distribution_dict fitting_cycles opt

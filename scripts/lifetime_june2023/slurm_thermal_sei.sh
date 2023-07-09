@@ -10,5 +10,5 @@
 #SBATCH --mem 16G
 
 
-julia --project=. scripts/lifetime_june2023/thermal_sei.jl
+julia --project=. scripts/lifetime_june2023/thermal_sei_buildup.jl
 
