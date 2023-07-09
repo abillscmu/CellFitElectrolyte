@@ -138,6 +138,14 @@ for cell in cells
             arr[i] = 1158
             a = 1158
         end
+        if (cell == "VAH11") & (a == 1999)
+            arr[i] = 2003
+            a = 2003
+        end
+        if (cell == "VAH11") & (a == 2247)
+            arr[i] = 2246
+            a = 2246
+        end
         if !(successarr[i])
             continue
         end
@@ -165,9 +173,6 @@ end
 
 params = (:ω, :εₑ⁺, :εₑ⁻, :frac_sol_am_neg, :frac_sol_am_pos)
 @showprogress for cell in keys(files_to_use)
-    if cell in ["VAH01", "VAH02", "VAH05", "VAH06", "VAH07", "VAH09", "VAH10", "VAH11", "VAH12"]
-        continue
-    end
     for p in params
         fig, ax = subplots()
         for c in files_to_use[cell]
@@ -180,7 +185,13 @@ params = (:ω, :εₑ⁺, :εₑ⁻, :frac_sol_am_neg, :frac_sol_am_pos)
     end
 end
 
+first_cells = ["VAH01", "VAH02","VAH05","VAH06","VAH07","VAH09","VAH10","VAH11","VAH12","VAH13","VAH15","VAH16","VAH17"]
+extremes = ["VAH02", "VAH12", "VAH06", "VAH16", "VAH01", "VAH11", "VAH30", "VAH09"]
+baselines = ["VAH01", "VAH17", "VAH27"]
 
+files_to_use["baseline"] = baselines
+files_to_use["extremes"] = extremes
+files_to_use["first_cells"] = first_cells
 
 @save "files_to_use.jld2" files_to_use
 
