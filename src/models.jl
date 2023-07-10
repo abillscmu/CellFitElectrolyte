@@ -161,6 +161,10 @@ function sei_kinetic(k_sei, Temp, η_sei, E_sei)
     return k_sei*arrhenius(E_sei, Temp)*exp(-(η_sei*0.5*CellFitElectrolyte.F)/(CellFitElectrolyte.R*Temp))
 end
 
+function sei_diffusive(k_sei, L_sol, E_sei, Temp)
+    return arrhenius(E_sei, Temp)*CellFitElectrolyte.F*k_sol/L_sol
+end
+
 function sei_delta_growth(I_sei, δ, R, εₑ, Vₘ)
     δ̇ = ((R + δ)/(3*(1-εₑ)))*(I_sei/2*CellFitElectrolyte.F)*Vₘ
     return δ̇
