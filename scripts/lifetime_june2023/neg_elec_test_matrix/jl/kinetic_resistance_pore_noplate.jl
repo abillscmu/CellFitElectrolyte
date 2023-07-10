@@ -152,7 +152,7 @@ end
     k_pore_exponent ~ Uniform(-3, 3)
     k_pore = -1*10. ^k_pore_exponent
     k_resistance = 1*10. ^k_resistance_exponent
-    k_sei_exponent ~ Uniform(-7, -4)
+    k_sei_exponent ~ Uniform(-10, -2)
     k_sei = 1*10. ^k_sei_exponent
     E_sei ~ Uniform(0, 10000)
 
