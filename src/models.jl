@@ -141,6 +141,10 @@ function arrhenius!(A,E,Temp)
     mul!(A,A,correction)
 end
 
+function arrhenius(E, Temp)
+    return exp((E/293) - (E/Temp))
+end
+
 function sei_ohmic(ω,Iapp)
     η_sei = ω*Iapp
     return η_sei
@@ -154,7 +158,7 @@ function sei_growth(c_s_bulk, k_sei, α_sei, Temp, η_sei, D_sei, δ)
 end
 
 function sei_kinetic(k_sei, Temp, η_sei, E_sei)
-    return k_sei*exp(-η_sei*E_sei/CellFitElectrolyte.R*Temp)
+    return k_sei*arrhenius(E_sei, Temp)*exp(-(η_sei*0.5*CellFitElectrolyte.F)/CellFitElectrolyte.R*Temp)
 end
 
 function sei_delta_growth(I_sei, δ, R, εₑ, Vₘ)
