@@ -188,10 +188,11 @@ end
 first_cells = ["VAH01", "VAH02","VAH05","VAH06","VAH07","VAH09","VAH10","VAH11","VAH12","VAH13","VAH15","VAH16","VAH17"]
 extremes = ["VAH02", "VAH12", "VAH06", "VAH16", "VAH01", "VAH11", "VAH30", "VAH09"]
 baselines = ["VAH01", "VAH17", "VAH27"]
+all_files = String[k for k in keys(files_to_use)]
 
 files_to_use["baseline"] = baselines
 files_to_use["extremes"] = extremes
 files_to_use["first_cells"] = first_cells
+files_to_use["all_files"] = all_files
 
 @save "files_to_use.jld2" files_to_use
-
