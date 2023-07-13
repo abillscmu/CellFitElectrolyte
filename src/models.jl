@@ -165,6 +165,10 @@ function sei_diffusive(k_sei, L_sol, E_sei, Temp)
     return arrhenius(E_sei, Temp)*CellFitElectrolyte.F*k_sei/L_sol
 end
 
+function dissolution(k_dissolution, Temp, η_dissolution, E)
+    return arrhenius(E, Temp)*k_dissolution*exp(1*CellFitElectrolyte.F*η_dissolution/(CellFitElectrolyte.R*Temp))
+end
+
 function sei_delta_growth(I_sei, δ, R, εₑ, Vₘ)
     δ̇ = ((R + δ)/(3*(1-εₑ)))*(I_sei/2*CellFitElectrolyte.F)*Vₘ
     return δ̇

@@ -1,5 +1,3 @@
-(2.1005753688487417e-6, 0.5530869950282526, 9.405044010289599)
-
 using CellFitElectrolyte
 using CellFitElectrolyte.ComponentArrays
 using CellFitElectrolyte.OrdinaryDiffEq
@@ -101,14 +99,14 @@ cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vect
 
 
 
-function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E_sei)
+function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resistance)
     #Create Function (with neural network)
     println((k_sei, E_sei, k_resistance))
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
         Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
         du[9:end] .= 0
-        j_sei = CellFitElectrolyte.sei_kinetic(k_sei, u[14], U⁻ + η⁻ + 0.4, E_sei)
+        j_sei = CellFitElectrolyte.sei_diffusive(k_sei, u[9], E_sei, u[14])
         du[9] = k_resistance * j_sei
         du[12] = - j_sei
         # Thermal model
@@ -131,12 +129,14 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
             success = CellFitElectrolyte.simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
+                println(integrator.u)
                 return 0
             end
         else
             success = CellFitElectrolyte.simulate_normal_cycle!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv, num_steps)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
+                println(integrator.u)
                 return 0
             end
         end
@@ -148,10 +148,10 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
     #return integrator.sol
 end
 
-
-function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei, k_resistance_exponent)
+function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
 
     k_resistance = 1*10. ^ k_resistance_exponent
+    k_sei = 1*10. ^ k_sei_exponent
     sol_dict = Dict()
 
 
@@ -194,7 +194,7 @@ function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, k_resistance, saves, k_sei, E_sei)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
         catch
             sol = zeros(length(u), length(saves)+1)
         end
@@ -208,21 +208,21 @@ function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
     return sol_dict
 end
 
-vals = (2.6039710479438718e-8, 0.004515731305887231, 0.06093776169193021)
+values = (6.753472252508393e-15, 1.3469668487071478e-11, 0.0736952378016838)
 
-k_sei = vals[1]
-E_sei = vals[2]
-k_resistance_exponent = log10(vals[3])
+k_sei_exponent = log10(values[1])
+E_sei = values[2]
+k_resistance_exponent = log10(values[3])
 
-my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei, E_sei, k_resistance_exponent)
+my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
 
 
 #cell = "VAH09"
-fig,ax = subplots()
-cells = ["VAH01", "VAH12"]
-colors = ["tab:blue", "tab:orange"]
-for (i,cell) in enumerate(cells)#enumerate(keys(distribution_dict))
-    ax.plot(vcat(1, fitting_cycles[cell]), my_sol[cell][:frac_sol_am_neg][1])
+param_to_plot = :ω
+for (i,cell) in enumerate(keys(distribution_dict))
+    println("doing cell $cell")
+    fig,ax = subplots()
+    ax.plot(vcat(1, fitting_cycles[cell]), my_sol[cell][param_to_plot][1])
     xs = sort(collect(keys(distribution_dict[cell])))
     ys = zeros(1000,length(xs))
     for (i,x) in enumerate(xs)
@@ -231,14 +231,14 @@ for (i,cell) in enumerate(cells)#enumerate(keys(distribution_dict))
             my_sol[cell][:εₑ⁻][1][i],
             my_sol[cell][:frac_sol_am_neg][1][i],
         ]
-        ys[:,i] .= distribution_dict[cell][x][:frac_sol_am_neg]
+        ys[:,i] .= distribution_dict[cell][x][param_to_plot]
         logprob = log(MultiKDE.pdf(distribution_dict[cell][x]["kde"], ending_vals))
         println("cell $cell cycle $x probability $logprob")
     end
     ax.violinplot(ys,positions=xs,widths=maximum(xs)/10)
     ax.set_xlabel("Cycle number")
-    ax.set_ylabel("fₛ⁻")
+    ax.set_ylabel(param_to_plot)
     ax.set_title(cell)
+    fig.tight_layout()
+    fig.savefig("first_cells/$cell.pdf",bbox_inches="tight")
 end
-fig.tight_layout()
-fig.savefig("first_cells/$cell.pdf",bbox_inches="tight")
