@@ -147,9 +147,9 @@ function lifetime_evaluator(p, cycle_array_vec, u, k_resistance, saves, k_sei, E
 end
 
 @model function turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
-    k_resistance_exponent ~ Uniform(-3, 3)
+    k_resistance_exponent ~ Uniform(-4, 1)
     k_resistance = 1*10. ^k_resistance_exponent
-    k_sei_exponent ~ Uniform(-10, -2)
+    k_sei_exponent ~ Uniform(-6, -3)
     k_sei = 1*10. ^k_sei_exponent
     E_sei ~ Uniform(0, 10000)
 

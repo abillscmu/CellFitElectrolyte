@@ -142,7 +142,7 @@ function arrhenius!(A,E,Temp)
 end
 
 function arrhenius(E, Temp)
-    return exp((E/293) - (E/Temp))
+    return exp((E/300.0) - (E/Temp))
 end
 
 function sei_ohmic(ω,Iapp)
@@ -162,7 +162,7 @@ function sei_kinetic(k_sei, Temp, η_sei, E_sei)
 end
 
 function sei_diffusive(k_sei, L_sol, E_sei, Temp)
-    return arrhenius(E_sei, Temp)*CellFitElectrolyte.F*k_sol/L_sol
+    return arrhenius(E_sei, Temp)*CellFitElectrolyte.F*k_sei/L_sol
 end
 
 function sei_delta_growth(I_sei, δ, R, εₑ, Vₘ)
