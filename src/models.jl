@@ -145,6 +145,24 @@ function arrhenius(E, Temp)
     return exp((E/300.0) - (E/Temp))
 end
 
+function stress_model_pos(u, stress_param)
+    cₛᵇ⁺ = u[6]
+    cₛˢ⁺ = u[7]
+    c̄ = 0
+    c_avg = ((cₛᵇ⁺ - c̄) + (cₛˢ⁺ - c̄))/2
+    σₜ =  stress_param*((2*(cₛˢ⁺-c̄) + (c_avg) - (c̄/3)))
+    σᵣ = 0 #(no-traction)
+    σₕ = (σₜ + σᵣ)/3
+    return σₕ, σₜ, σᵣ
+end
+
+function stress_lam(σₕ, σ_c, β, m)
+    # assuming that the 
+    σₕ = max(σₕ, 0)
+    j_lam = β*((σₕ/σ_c)^m)
+    return j_lam
+end
+
 function sei_ohmic(ω,Iapp)
     η_sei = ω*Iapp
     return η_sei
