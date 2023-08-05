@@ -28,12 +28,11 @@ cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
 p = CellFitElectrolyte.p_transport()
 initialcond = Dict("Starting Voltage[V]"=>4.2,"Ambient Temperature[K]" => 300.0)
 vfull = initialcond["Starting Voltage[V]"]
-cellgeometry = CellFitElectrolyte.cell_geometry()
+cellgeometry = CellFitElectrolyte.cell_geometry_new()
 
 @load "files_to_use.jld2"
-dataset = "all_files"
+dataset = ARGS[1]
 cells_to_use = files_to_use[dataset]
-cells_to_use = ["VAH01",]
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
 
 
@@ -192,12 +191,12 @@ end
         p_phys = p.p_phys
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
-        #sol = try 
+        sol = try 
             sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_dissolution, E_dissolution)
-        #catch
-        #    @info "Solver errored"
-        #    sol = 0
-        #end
+        catch
+            @info "Solver errored"
+            sol = 0
+        end
         if sol == 0
             Turing.@addlogprob! -Inf
             return nothing
@@ -296,4 +295,4 @@ E_dissolution = opt.values[2]
 
 my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_dissolution_exponent, E_dissolution)
 
-@save "lifetime_results/kinetic_resistance_nopore_noplate_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt
+@save "lifetime_results/dissolution_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt

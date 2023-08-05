@@ -33,7 +33,6 @@ cellgeometry = CellFitElectrolyte.cell_geometry_new()
 @load "files_to_use.jld2"
 dataset = ARGS[1]
 cells_to_use = files_to_use[dataset]
-#cells_to_use = ["VAH01",]
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
 
 
@@ -100,16 +99,17 @@ cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vect
 
 
 
-function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resistance)
+function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resistance, k_plating, E_plating)
     #Create Function (with neural network)
-    println((k_sei, E_sei, k_resistance))
+    println((k_sei, E_sei, k_resistance, k_plating, E_plating))
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
         Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
         du[9:end] .= 0
         j_sei = CellFitElectrolyte.sei_diffusive(k_sei, u[9], E_sei, u[14])
+        j_plate = CellFitElectrolyte.sei_kinetic(k_plating, u[14], U⁺ - η⁺, E_plating)
         du[9] = k_resistance * j_sei
-        du[12] = - j_sei
+        du[12] = - (j_sei + j_plate)
         # Thermal model
         OCV = U⁺ - U⁻
         CellFitElectrolyte.thermal_model(du, u, p_thermal, Voltage, OCV)
@@ -155,6 +155,9 @@ end
     E_sei ~ Uniform(0, 10000)
     k_resistance_exponent ~ Uniform(-2, 1)
     k_resistance = 1*10. ^k_resistance_exponent
+    k_plating_exponent ~ Uniform(-12, -8)
+    k_plating = 1*10. ^k_plating_exponent
+    E_plating ~ Uniform(-10000, 0)
 
 
     for vah in keys(fitting_cycles)
@@ -196,7 +199,7 @@ end
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance, k_plating, E_plating)
         catch
             @info "Solver errored"
             sol = 0
@@ -226,14 +229,17 @@ end
 
 model = turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
 
-opt = optimize(model, MAP(),[-15, 250.0, -0.75], NelderMead())
-@save "lifetime_results/diffusive_resistance_nopore_noplate_checkpoint_$(dataset).jld2" opt
+opt = optimize(model, MAP(),[-15, 250.0, -0.75, -10, -1000], NelderMead())
 
-function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
+
+@save "lifetime_results/diffusive_resistance_nopore_plate_checkpoint_$(dataset).jld2" opt
+
+function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent, k_plating_exponent, E_plating)
 
     k_resistance = 1*10. ^ k_resistance_exponent
     k_sei = 1*10. ^ k_sei_exponent
     sol_dict = Dict()
+    k_plating = 1*10. ^k_plating_exponent
 
 
     for vah in keys(fitting_cycles)
@@ -275,7 +281,7 @@ function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance, k_plating, E_plating)
         catch
             sol = zeros(length(u), length(saves))
         end
@@ -292,9 +298,11 @@ end
 k_sei_exponent = opt.values[1]
 E_sei = opt.values[2]
 k_resistance_exponent = opt.values[3]
+k_plating_exponent = opt.values[4]
+E_plating = opt.values[5]
 
-my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
+my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent, k_plating_exponent, E_plating)
 
 cell_to_plot = "VAH01"
 
-@save "lifetime_results/diffusive_resistance_nopore_noplate_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt
+@save "lifetime_results/diffusive_resistance_nopore_plate_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt

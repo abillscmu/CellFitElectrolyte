@@ -46,7 +46,7 @@ param_to_idx = Dict(
     :frac_sol_am_pos=>13
 )
 
-params = (:ω, :εₑ⁻, :frac_sol_am_neg)
+params = (:εₑ⁺, :frac_sol_am_pos)
 
 function chainoperator(chain, param, operator)
     return operator(chain[param].data[:,1])
@@ -100,16 +100,16 @@ cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vect
 
 
 
-function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resistance)
+function lifetime_evaluator(p, cycle_array_vec, u, saves, stress_param, σ_c, β, m)
     #Create Function (with neural network)
-    println((k_sei, E_sei, k_resistance))
+    println((stress_param, σ_c, β, m))
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
         Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
         du[9:end] .= 0
-        j_sei = CellFitElectrolyte.sei_diffusive(k_sei, u[9], E_sei, u[14])
-        du[9] = k_resistance * j_sei
-        du[12] = - j_sei
+        σ_h, σₜ, σᵣ = CellFitElectrolyte.stress_model_pos(u, stress_param)
+        j_lam = CellFitElectrolyte.stress_lam(σ_h, σ_c, β, m)
+        du[13] = - j_lam
         # Thermal model
         OCV = U⁺ - U⁻
         CellFitElectrolyte.thermal_model(du, u, p_thermal, Voltage, OCV)
@@ -149,13 +149,14 @@ function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resist
     #return integrator.sol
 end
 
-@model function turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
-    k_sei_exponent ~ Uniform(-16, -14)
-    k_sei = 1*10. ^k_sei_exponent
-    E_sei ~ Uniform(0, 10000)
-    k_resistance_exponent ~ Uniform(-2, 1)
-    k_resistance = 1*10. ^k_resistance_exponent
 
+@model function turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
+    stress_param_exponent ~ Uniform(1, 3)
+    stress_param = 1. *10^stress_param_exponent
+    σ_c ~ Uniform(200000, 400000)
+    β_exponent ~ Uniform(-16, -9)
+    m ~ Uniform(1.5, 4)
+    β = 1. *10^β_exponent
 
     for vah in keys(fitting_cycles)
         cycles = fitting_cycles[vah]
@@ -191,12 +192,12 @@ end
         saves = fitting_cycles[vah] .- first_cycle .+ 1
 
         u_top = vcat(ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
-        u_bot = zeros(typeof(k_resistance), 8)
+        u_bot = zeros(typeof(stress_param), 8)
         p_phys = p.p_phys
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, stress_param, σ_c, β, m)
         catch
             @info "Solver errored"
             sol = 0
@@ -205,7 +206,9 @@ end
             Turing.@addlogprob! -Inf
             return nothing
         end
-        ω_end = sol[12,end]
+        ω_start = sol[13,1]
+        println("starting frac: $ω_start")
+        ω_end = sol[13,end]
         println("ending frac: $ω_end")
         for (i,cycle) in enumerate(cycles)
             ending_vals = [sol[param_to_idx[p],i+1] for (j,p) in enumerate(params)]
@@ -226,15 +229,19 @@ end
 
 model = turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
 
-opt = optimize(model, MAP(),[-15, 250.0, -0.75], NelderMead())
-@save "lifetime_results/diffusive_resistance_nopore_noplate_checkpoint_$(dataset).jld2" opt
+opt = optimize(model, MAP(), NelderMead())
 
-function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
+stress_param_exponent = opt.values[1]
+σ_c = opt.values[2]
+β_exponent = opt.values[3]
+m = opt.values[4]
 
-    k_resistance = 1*10. ^ k_resistance_exponent
-    k_sei = 1*10. ^ k_sei_exponent
+#@save "lifetime_results/dissolution_checkpoint_$(dataset).jld2" opt
+
+function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, stress_param_exponent, σ_c, β_exponent, m)
+    stress_param = 1. *10^stress_param_exponent
+    β = 1. *10^β_exponent
     sol_dict = Dict()
-
 
     for vah in keys(fitting_cycles)
         cycles = fitting_cycles[vah]
@@ -270,12 +277,12 @@ function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
         saves = fitting_cycles[vah] .- first_cycle .+ 1
 
         u_top = vcat(ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
-        u_bot = zeros(typeof(k_resistance), 8)
+        u_bot = zeros(typeof(stress_param), 8)
         p_phys = p.p_phys
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, stress_param, σ_c, β, m)
         catch
             sol = zeros(length(u), length(saves))
         end
@@ -289,12 +296,12 @@ function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fittin
     return sol_dict
 end
 
-k_sei_exponent = opt.values[1]
-E_sei = opt.values[2]
-k_resistance_exponent = opt.values[3]
 
-my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
+stress_param_exponent = opt.values[1]
+σ_c = opt.values[2]
+β_exponent = opt.values[3]
+m = opt.values[4]
 
-cell_to_plot = "VAH01"
+my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, stress_param_exponent, σ_c, β_exponent, m)
 
-@save "lifetime_results/diffusive_resistance_nopore_noplate_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt
+@save "lifetime_results/stress_lam_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt

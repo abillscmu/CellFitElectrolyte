@@ -6,6 +6,7 @@ using CellFitElectrolyte.Parameters
 using CellFitElectrolyte.DataInterpolations
 using CellFitElectrolyte.DiffEqFlux
 using CellFitElectrolyte.Turing
+using DiffEqFlux
 using BenchmarkTools
 using StaticArrays
 using CSV
@@ -22,6 +23,10 @@ using PythonPlot
 using Optim
 using MultiKDE
 
+mychain = FastChain(FastDense(14, 10, tanh), FastDense(10, 5))
+ip = initial_params(mychain)
+
+
 #set up simulation
 cache = CellFitElectrolyte.initialize_cache(Float64)
 cathodeocv,anodeocv = CellFitElectrolyte.initialize_airbus_ocv()
@@ -33,8 +38,8 @@ cellgeometry = CellFitElectrolyte.cell_geometry_new()
 @load "files_to_use.jld2"
 dataset = ARGS[1]
 cells_to_use = files_to_use[dataset]
-#cells_to_use = ["VAH01",]
 fitting_cycles = Dict(k => files_to_use[k] for k in cells_to_use)
+
 
 
 predicted_states = [:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos]
@@ -46,7 +51,7 @@ param_to_idx = Dict(
     :frac_sol_am_pos=>13
 )
 
-params = (:ω, :εₑ⁻, :frac_sol_am_neg)
+params = (:ω, :εₑ⁻, :εₑ⁺, :frac_sol_am_neg, :frac_sol_am_pos)
 
 function chainoperator(chain, param, operator)
     return operator(chain[param].data[:,1])
@@ -100,17 +105,23 @@ cycle_array_vec = CellFitElectrolyte.load_airbus_cyclearrays()["cycle_array_vect
 
 
 
-function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resistance)
+function lifetime_evaluator(p, cycle_array_vec, u, saves, nn_params)
     #Create Function (with neural network)
-    println((k_sei, E_sei, k_resistance))
+    u_normalized = similar(u)
+    function custom_normalize!(u_in)
+        u_normalized[1:2] .= (@view u_in[1:2])./anodeocv.c_s_max
+        u_normalized[6:7] .= (@view u_in[6:7])./cathodeocv.c_s_max
+        u_normalized[3:5] .= (@view u_in[3:5])./4000
+        u_normalized[9] = u_in[9]./0.075
+        u_normalized[10:13] .= u_in[10:13]
+        u_normalized[14] = (u_in[14] .- 290)./45
+        return u_normalized
+    end
     function f(du, u, p, t)
         @unpack p_nn, p_phys, p_thermal = p
         Voltage, U⁺, U⁻, η⁺, η⁻ = CellFitElectrolyte.equations_electrolyte_allocating_new_withvoltage!(du, u, p_phys, t, cache, cellgeometry, cathodeocv, anodeocv)
-        du[9:end] .= 0
-        j_sei = CellFitElectrolyte.sei_diffusive(k_sei, u[9], E_sei, u[14])
-        du[9] = k_resistance * j_sei
-        du[12] = - j_sei
-        # Thermal model
+        u2 = custom_normalize!(u)
+        du[9:13] .= mychain(u2, nn_params) 
         OCV = U⁺ - U⁻
         CellFitElectrolyte.thermal_model(du, u, p_thermal, Voltage, OCV)
         return nothing
@@ -130,14 +141,12 @@ function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resist
             success = CellFitElectrolyte.simulate_rpt!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
-                println(integrator.u)
                 return 0
             end
         else
             success = CellFitElectrolyte.simulate_normal_cycle!(integrator, cycle_array, cache, cellgeometry, cathodeocv, anodeocv, num_steps)
             if !(success)
                 println("Failed at step $i due to $(integrator.sol.retcode)")
-                println(integrator.u)
                 return 0
             end
         end
@@ -150,12 +159,8 @@ function lifetime_evaluator(p, cycle_array_vec, u, saves, k_sei, E_sei, k_resist
 end
 
 @model function turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
-    k_sei_exponent ~ Uniform(-16, -14)
-    k_sei = 1*10. ^k_sei_exponent
-    E_sei ~ Uniform(0, 10000)
-    k_resistance_exponent ~ Uniform(-2, 1)
-    k_resistance = 1*10. ^k_resistance_exponent
 
+    nn_params ~ MvNormal(zeros(length(ip)), 1e-10)
 
     for vah in keys(fitting_cycles)
         cycles = fitting_cycles[vah]
@@ -191,12 +196,12 @@ end
         saves = fitting_cycles[vah] .- first_cycle .+ 1
 
         u_top = vcat(ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
-        u_bot = zeros(typeof(k_resistance), 8)
+        u_bot = zeros(eltype(nn_params), 8)
         p_phys = p.p_phys
         CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
         u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
         sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
+            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, nn_params)
         catch
             @info "Solver errored"
             sol = 0
@@ -226,75 +231,4 @@ end
 
 model = turing_life_fit(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles)
 
-opt = optimize(model, MAP(),[-15, 250.0, -0.75], NelderMead())
-@save "lifetime_results/diffusive_resistance_nopore_noplate_checkpoint_$(dataset).jld2" opt
-
-function run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
-
-    k_resistance = 1*10. ^ k_resistance_exponent
-    k_sei = 1*10. ^ k_sei_exponent
-    sol_dict = Dict()
-
-
-    for vah in keys(fitting_cycles)
-        cycles = fitting_cycles[vah]
-        first_cycle = cycles[1]
-        last_cycle = cycles[end]
-        cellnum = parse(Int, vah[4:end])
-
-        ω = mean(distribution_dict[vah][first_cycle][:ω])
-        εₑ⁻ = mean(distribution_dict[vah][first_cycle][:εₑ⁻])
-        εₑ⁺ = mean(distribution_dict[vah][first_cycle][:εₑ⁺])
-        frac_sol_am_neg = mean(distribution_dict[vah][first_cycle][:frac_sol_am_neg])
-        frac_sol_am_pos = mean(distribution_dict[vah][first_cycle][:frac_sol_am_pos])
-
-        εₛ⁻ = (1 - εₑ⁻)*frac_sol_am_neg
-        εₛ⁺ = (1 - εₑ⁺)*frac_sol_am_pos
-        εᵧ⁻ = 1 - εₛ⁻ - εₑ⁻
-        εᵧ⁺ = 1 - εₛ⁺ - εₑ⁺
-
-        p_phys = ComponentVector{Float64}(θₛ⁻ = 6.130391775012598e-10, θₑ = 3e-6, θₛ⁺ = 3.728671559985511e-8, R⁺ = 4.2902932816468984e-6, R⁻ = 6.7447548850488327e-6, β⁻ = 1.5, β⁺ = 1.5, βˢ = 1.5, εₛ⁻ = εₛ⁻, εₛ⁺ = εₛ⁺, εᵧ⁺ = εᵧ⁺, εᵧ⁻ = εᵧ⁻, c = 50.0, h = 0.1, Tamb = 298.15, Temp = 298.15, k₀⁺ = 1e-1, k₀⁻ = 1e-1, x⁻₀ = 0.6, εₑˢ = 0.8, cₑ₀ = 2000.0, κ = 0.25, t⁺ = 0.38, input_type = 3.0, input_value = 4.2, ω = ω, Eₑ = 50.0, Eₛ⁺ = 50.0, Eₛ⁻ = 50.0, cccv_switch=false, cccv_switch_2=false, vfull=vfull, ifull=-0.01)
-        p_thermal = ComponentVector(T_amb = cycle_array_vec[cellnum][first_cycle][end], C = 48.52559886527583, ha=0.005659969188357159, hb = 0.011298387604847037)
-
-
-        # Handle Initial Conditions
-        p_nn = zeros(10)
-        T = eltype(p_nn)
-        p = ComponentArray{Float64}(p_phys = p_phys, p_nn = p_nn, p_thermal=p_thermal)
-        
-        Temp = 320.0
-        @pack! p.p_phys = Temp
-        input_type = 0
-        input_value = 0
-        @pack! p.p_phys = input_type,input_value
-        saves = fitting_cycles[vah] .- first_cycle .+ 1
-
-        u_top = vcat(ω, εₑ⁻, εₑ⁺, frac_sol_am_neg, frac_sol_am_pos)
-        u_bot = zeros(typeof(k_resistance), 8)
-        p_phys = p.p_phys
-        CellFitElectrolyte.initial_conditions!(u_bot,p_phys,cellgeometry,initialcond,cathodeocv,anodeocv)
-        u = vcat(u_bot, u_top, cycle_array_vec[cellnum][first_cycle][end])
-        sol = try 
-            sol = lifetime_evaluator(p, cycle_array_vec[cellnum][first_cycle:last_cycle], u, saves, k_sei, E_sei, k_resistance)
-        catch
-            sol = zeros(length(u), length(saves))
-        end
-        ω_end = sol[12,end]
-        println("ending frac: $ω_end")
-        sol_dict[vah] = Dict()
-        for p in params
-            sol_dict[vah][p] = [sol[param_to_idx[p],:]]
-        end
-    end
-    return sol_dict
-end
-
-k_sei_exponent = opt.values[1]
-E_sei = opt.values[2]
-k_resistance_exponent = opt.values[3]
-
-my_sol = run_thru(distribution_dict, cycle_array_vec, lifetime_evaluator, fitting_cycles, k_sei_exponent, E_sei, k_resistance_exponent)
-
-cell_to_plot = "VAH01"
-
-@save "lifetime_results/diffusive_resistance_nopore_noplate_$(dataset).jld2" my_sol distribution_dict fitting_cycles opt
+opt = optimize(model, MAP(), GradientDescent())
